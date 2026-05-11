@@ -1,0 +1,6 @@
+{
+  "name": "Medication Tracker",
+  "render_readme": true,
+  "domains": ["sensor", "binary_sensor"],
+  "homeassistant": "2024.6.0"
+}

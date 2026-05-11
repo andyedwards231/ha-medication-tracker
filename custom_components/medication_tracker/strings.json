@@ -1,0 +1,65 @@
+{
+  "title": "Medication Tracker",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Medication Tracker",
+        "description": "Create your first local medication schedule. Enter multiple due times as comma-separated HH:MM values.",
+        "data": {
+          "name": "Medication name",
+          "dose": "Dose",
+          "schedule_type": "Schedule type",
+          "due_times": "Due times",
+          "notes": "Notes",
+          "weekdays": "Weekdays",
+          "cycle_start_date": "Cycle start date",
+          "cycle_on_days": "Cycle on days",
+          "cycle_off_days": "Cycle off days",
+          "grace_period_minutes": "Grace period minutes",
+          "icon": "Icon"
+        }
+      }
+    },
+    "error": {
+      "invalid_time": "Enter at least one valid HH:MM due time.",
+      "cycle_required": "Cycle schedules require a start date and on-days."
+    },
+    "abort": {
+      "already_configured": "Medication Tracker is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Add medication",
+        "description": "Add another medication. {services}",
+        "data": {
+          "name": "Medication name",
+          "dose": "Dose",
+          "schedule_type": "Schedule type",
+          "due_times": "Due times",
+          "notes": "Notes",
+          "weekdays": "Weekdays",
+          "cycle_start_date": "Cycle start date",
+          "cycle_on_days": "Cycle on days",
+          "cycle_off_days": "Cycle off days",
+          "grace_period_minutes": "Grace period minutes",
+          "icon": "Icon"
+        }
+      }
+    },
+    "error": {
+      "invalid_time": "Enter at least one valid HH:MM due time."
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "due": "Medication becomes due",
+      "missed": "Medication is missed",
+      "taken": "Medication is marked as taken",
+      "skipped": "Medication is skipped",
+      "required_today": "Medication is required today",
+      "not_required_today": "Medication is not required today"
+    }
+  }
+}

@@ -1,0 +1,238 @@
+mark_taken:
+  name: Mark taken
+  description: Mark the next relevant due or pending dose as taken.
+  target:
+    entity:
+      domain: sensor
+      integration: medication_tracker
+  fields:
+    scheduled_for:
+      name: Scheduled for
+      description: Optional scheduled datetime to mark as taken. Defaults to the earliest unhandled due dose.
+      selector:
+        text:
+    taken_at:
+      name: Taken at
+      description: Optional datetime when the dose was taken. Defaults to now.
+      selector:
+        text:
+    source:
+      name: Source
+      description: Optional source, such as Dashboard, Telegram, or Automation.
+      selector:
+        text:
+    note:
+      name: Note
+      description: Optional note to store with the dose event.
+      selector:
+        text:
+          multiline: true
+
+undo_taken:
+  name: Undo taken
+  description: Remove or reverse a taken dose record.
+  target:
+    entity:
+      domain: sensor
+      integration: medication_tracker
+  fields:
+    scheduled_for:
+      name: Scheduled for
+      description: Optional scheduled datetime to undo. Defaults to the latest taken dose for the medication.
+      selector:
+        text:
+
+skip_dose:
+  name: Skip dose
+  description: Mark the next relevant dose as intentionally skipped.
+  target:
+    entity:
+      domain: sensor
+      integration: medication_tracker
+  fields:
+    scheduled_for:
+      name: Scheduled for
+      description: Optional scheduled datetime to skip. Defaults to the earliest unhandled due dose.
+      selector:
+        text:
+    reason:
+      name: Reason
+      description: Optional reason for skipping the dose.
+      selector:
+        text:
+          multiline: true
+    source:
+      name: Source
+      description: Optional source, such as Dashboard, Telegram, or Automation.
+      selector:
+        text:
+
+add_medication:
+  name: Add medication
+  description: Create a medication schedule.
+  fields:
+    name:
+      name: Name
+      required: true
+      selector:
+        text:
+    dose:
+      name: Dose
+      required: true
+      selector:
+        text:
+    schedule_type:
+      name: Schedule type
+      required: true
+      selector:
+        select:
+          options:
+            - label: Every day
+              value: every_day
+            - label: Multiple times per day
+              value: multiple_times_per_day
+            - label: Specific weekdays
+              value: specific_weekdays
+            - label: Once per week
+              value: once_per_week
+            - label: Cycle based
+              value: cycle
+    due_times:
+      name: Due times
+      description: List of HH:MM due times.
+      required: true
+      selector:
+        object:
+    notes:
+      name: Notes
+      selector:
+        text:
+          multiline: true
+    weekdays:
+      name: Weekdays
+      description: Python weekday numbers, Monday 0 through Sunday 6.
+      selector:
+        object:
+    cycle_start_date:
+      name: Cycle start date
+      selector:
+        date:
+    cycle_on_days:
+      name: Cycle on days
+      selector:
+        number:
+          min: 1
+          max: 365
+          mode: box
+    cycle_off_days:
+      name: Cycle off days
+      selector:
+        number:
+          min: 0
+          max: 365
+          mode: box
+    grace_period_minutes:
+      name: Grace period minutes
+      default: 60
+      selector:
+        number:
+          min: 0
+          max: 1440
+          mode: box
+    icon:
+      name: Icon
+      selector:
+        icon:
+
+remove_medication:
+  name: Remove medication
+  description: Remove a medication and its stored history.
+  target:
+    entity:
+      domain: sensor
+      integration: medication_tracker
+  fields:
+    medication_id:
+      name: Medication ID
+      description: Optional medication id if no entity target is provided.
+      selector:
+        text:
+
+update_medication:
+  name: Update medication
+  description: Update a medication definition.
+  target:
+    entity:
+      domain: sensor
+      integration: medication_tracker
+  fields:
+    medication_id:
+      name: Medication ID
+      description: Optional medication id if no entity target is provided.
+      selector:
+        text:
+    name:
+      name: Name
+      selector:
+        text:
+    dose:
+      name: Dose
+      selector:
+        text:
+    schedule_type:
+      name: Schedule type
+      selector:
+        select:
+          options:
+            - label: Every day
+              value: every_day
+            - label: Multiple times per day
+              value: multiple_times_per_day
+            - label: Specific weekdays
+              value: specific_weekdays
+            - label: Once per week
+              value: once_per_week
+            - label: Cycle based
+              value: cycle
+    due_times:
+      name: Due times
+      selector:
+        object:
+    notes:
+      name: Notes
+      selector:
+        text:
+          multiline: true
+    weekdays:
+      name: Weekdays
+      selector:
+        object:
+    cycle_start_date:
+      name: Cycle start date
+      selector:
+        date:
+    cycle_on_days:
+      name: Cycle on days
+      selector:
+        number:
+          min: 1
+          max: 365
+          mode: box
+    cycle_off_days:
+      name: Cycle off days
+      selector:
+        number:
+          min: 0
+          max: 365
+          mode: box
+    grace_period_minutes:
+      name: Grace period minutes
+      selector:
+        number:
+          min: 0
+          max: 1440
+          mode: box
+    icon:
+      name: Icon
+      selector:
+        icon:
