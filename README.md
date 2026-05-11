@@ -35,11 +35,13 @@ Restart Home Assistant, then add the integration from **Settings > Devices & ser
 - Local-only storage using Home Assistant storage helpers.
 - No YAML setup, add-on, external app, or cloud API.
 - Config flow support.
+- Guided setup that only asks for weekday or cycle details when relevant.
 - Multiple medications.
 - Daily, multi-time daily, weekday, weekly, and cycle-based schedules.
 - Individual dose event history with taken, skipped, missed, and pending states.
 - 90-day default history retention.
 - Event-based automation support.
-- Device triggers for UI-friendly automation setup.
+- Device triggers and a device action for UI-friendly automation setup.
+- Local brand icon and logo for Home Assistant and HACS.
 
 Full usage documentation is in [custom_components/medication_tracker/README.md](custom_components/medication_tracker/README.md).

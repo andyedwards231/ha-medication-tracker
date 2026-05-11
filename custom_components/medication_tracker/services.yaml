@@ -1,32 +1,35 @@
 mark_taken:
-  name: Mark taken
-  description: Mark the next relevant due or pending dose as taken.
+  name: Mark medication as taken
+  description: Mark the selected medication's next relevant due or pending dose as taken.
   target:
     entity:
       domain: sensor
       integration: medication_tracker
   fields:
-    scheduled_for:
-      name: Scheduled for
-      description: Optional scheduled datetime to mark as taken. Defaults to the earliest unhandled due dose.
-      selector:
-        text:
-    taken_at:
-      name: Taken at
-      description: Optional datetime when the dose was taken. Defaults to now.
-      selector:
-        text:
-    source:
-      name: Source
-      description: Optional source, such as Dashboard, Telegram, or Automation.
-      selector:
-        text:
-    note:
-      name: Note
-      description: Optional note to store with the dose event.
-      selector:
-        text:
-          multiline: true
+    advanced_fields:
+      collapsed: true
+      fields:
+        scheduled_for:
+          name: Scheduled for
+          description: Optional scheduled datetime to mark as taken. Defaults to the earliest unhandled due dose.
+          selector:
+            text:
+        taken_at:
+          name: Taken at
+          description: Optional datetime when the dose was taken. Defaults to now.
+          selector:
+            text:
+        source:
+          name: Source
+          description: Optional source, such as Dashboard, Telegram, or Automation.
+          selector:
+            text:
+        note:
+          name: Note
+          description: Optional note to store with the dose event.
+          selector:
+            text:
+              multiline: true
 
 undo_taken:
   name: Undo taken

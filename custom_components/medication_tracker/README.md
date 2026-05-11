@@ -19,7 +19,7 @@ No YAML setup, add-on, cloud API, or external app is required.
 
 ## Adding Medications
 
-The config flow creates the first medication. The options flow can add another medication. Service actions are the most flexible way to add, edit, or remove medications.
+The config flow creates the first medication. It starts with the common fields, then only shows extra weekday or cycle fields when that schedule type needs them. The options flow can add another medication. Service actions are the most flexible way to edit or remove existing medications.
 
 ### Schedule Types
 
@@ -267,6 +267,12 @@ Medication devices expose UI-friendly automation triggers:
 - Medication is not required today
 
 These are backed by the normal Home Assistant events above. Event automations are still the most portable option.
+
+Medication devices also expose a UI-friendly action:
+
+- Mark medication as taken
+
+This device action calls `medication_tracker.mark_taken` for the selected medication. It is intended for simple automations where you want to choose the medication device in the visual editor and mark the next relevant dose as taken.
 
 ## Lovelace Markdown Card
 

@@ -2,27 +2,41 @@
   "title": "Medication Tracker",
   "config": {
     "step": {
-      "user": {
-        "title": "Medication Tracker",
-        "description": "Create your first local medication schedule. Enter multiple due times as comma-separated HH:MM values.",
+      "medication": {
+        "title": "Add your first medication",
+        "description": "Start with the details everyone needs. Enter multiple due times as comma-separated HH:MM values, for example 08:00, 13:00, 20:00.",
         "data": {
           "name": "Medication name",
-          "dose": "Dose",
-          "schedule_type": "Schedule type",
-          "due_times": "Due times",
-          "notes": "Notes",
-          "weekdays": "Weekdays",
-          "cycle_start_date": "Cycle start date",
-          "cycle_on_days": "Cycle on days",
-          "cycle_off_days": "Cycle off days",
-          "grace_period_minutes": "Grace period minutes",
-          "icon": "Icon"
+          "dose": "Dose or amount",
+          "schedule_type": "When is it needed?",
+          "due_times": "Due time or times",
+          "grace_period_minutes": "Grace period before missed",
+          "icon": "Medication icon",
+          "notes": "Notes"
+        }
+      },
+      "weekdays": {
+        "title": "Choose the weekday schedule",
+        "description": "Pick the day or days this medication is required.",
+        "data": {
+          "weekdays": "Required weekdays"
+        }
+      },
+      "cycle": {
+        "title": "Set up the cycle",
+        "description": "These fields only apply to cycle schedules, such as 21 days on and 7 days off.",
+        "data": {
+          "cycle_start_date": "First active day",
+          "cycle_on_days": "Days on",
+          "cycle_off_days": "Days off"
         }
       }
     },
     "error": {
       "invalid_time": "Enter at least one valid HH:MM due time.",
-      "cycle_required": "Cycle schedules require a start date and on-days."
+      "required": "This field is required.",
+      "weekdays_required": "Choose at least one weekday.",
+      "one_weekday_required": "Choose exactly one weekday for a once-per-week medication."
     },
     "abort": {
       "already_configured": "Medication Tracker is already configured."
@@ -30,26 +44,41 @@
   },
   "options": {
     "step": {
-      "init": {
-        "title": "Add medication",
-        "description": "Add another medication. {services}",
+      "medication": {
+        "title": "Add another medication",
+        "description": "Start with the main details. {services}",
         "data": {
           "name": "Medication name",
-          "dose": "Dose",
-          "schedule_type": "Schedule type",
-          "due_times": "Due times",
-          "notes": "Notes",
-          "weekdays": "Weekdays",
-          "cycle_start_date": "Cycle start date",
-          "cycle_on_days": "Cycle on days",
-          "cycle_off_days": "Cycle off days",
-          "grace_period_minutes": "Grace period minutes",
-          "icon": "Icon"
+          "dose": "Dose or amount",
+          "schedule_type": "When is it needed?",
+          "due_times": "Due time or times",
+          "grace_period_minutes": "Grace period before missed",
+          "icon": "Medication icon",
+          "notes": "Notes"
+        }
+      },
+      "weekdays": {
+        "title": "Choose the weekday schedule",
+        "description": "Pick the day or days this medication is required.",
+        "data": {
+          "weekdays": "Required weekdays"
+        }
+      },
+      "cycle": {
+        "title": "Set up the cycle",
+        "description": "These fields only apply to cycle schedules, such as 21 days on and 7 days off.",
+        "data": {
+          "cycle_start_date": "First active day",
+          "cycle_on_days": "Days on",
+          "cycle_off_days": "Days off"
         }
       }
     },
     "error": {
-      "invalid_time": "Enter at least one valid HH:MM due time."
+      "invalid_time": "Enter at least one valid HH:MM due time.",
+      "required": "This field is required.",
+      "weekdays_required": "Choose at least one weekday.",
+      "one_weekday_required": "Choose exactly one weekday for a once-per-week medication."
     }
   },
   "device_automation": {
@@ -60,6 +89,33 @@
       "skipped": "Medication is skipped",
       "required_today": "Medication is required today",
       "not_required_today": "Medication is not required today"
+    },
+    "action_type": {
+      "mark_taken": "Mark medication as taken"
+    }
+  },
+  "services": {
+    "mark_taken": {
+      "name": "Mark medication as taken",
+      "description": "Mark the selected medication's next relevant due or pending dose as taken.",
+      "fields": {
+        "scheduled_for": {
+          "name": "Scheduled for",
+          "description": "Optional scheduled datetime to mark as taken. Leave empty to use the earliest unhandled due dose."
+        },
+        "taken_at": {
+          "name": "Taken at",
+          "description": "Optional datetime when the dose was taken. Leave empty to use now."
+        },
+        "source": {
+          "name": "Source",
+          "description": "Optional source, such as Dashboard, Telegram, or Automation."
+        },
+        "note": {
+          "name": "Note",
+          "description": "Optional note to store with the dose event."
+        }
+      }
     }
   }
 }

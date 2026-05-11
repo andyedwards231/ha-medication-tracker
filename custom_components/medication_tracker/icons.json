@@ -1,0 +1,22 @@
+{
+  "services": {
+    "mark_taken": {
+      "service": "mdi:pill"
+    },
+    "undo_taken": {
+      "service": "mdi:undo"
+    },
+    "skip_dose": {
+      "service": "mdi:skip-next"
+    },
+    "add_medication": {
+      "service": "mdi:plus-circle"
+    },
+    "remove_medication": {
+      "service": "mdi:delete"
+    },
+    "update_medication": {
+      "service": "mdi:pencil"
+    }
+  }
+}
