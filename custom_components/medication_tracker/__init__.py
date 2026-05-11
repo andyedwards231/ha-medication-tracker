@@ -14,6 +14,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import service as service_helper
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util import dt as dt_util
 
@@ -49,25 +50,35 @@ from .storage import MedicationTrackerStore
 MedicationTrackerConfigEntry = ConfigEntry
 
 
-ENTITY_SERVICE_SCHEMA = vol.Schema(
-    {
-        vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
-        vol.Optional(CONF_MEDICATION_ID): cv.string,
-        vol.Optional(CONF_SCHEDULED_FOR): cv.string,
-    },
-    extra=vol.ALLOW_EXTRA,
-)
+def _entity_service_schema(fields: dict) -> Any:
+    """Return a schema that supports Home Assistant service targets."""
+    if hasattr(cv, "make_entity_service_schema"):
+        return cv.make_entity_service_schema(fields)
+    return vol.Schema(
+        {vol.Optional(ATTR_ENTITY_ID): cv.entity_ids, **fields},
+        extra=vol.ALLOW_EXTRA,
+    )
 
-MARK_TAKEN_SCHEMA = ENTITY_SERVICE_SCHEMA.extend(
+
+ENTITY_SERVICE_FIELDS = {
+    vol.Optional(CONF_MEDICATION_ID): cv.string,
+    vol.Optional(CONF_SCHEDULED_FOR): cv.string,
+}
+
+ENTITY_SERVICE_SCHEMA = _entity_service_schema(ENTITY_SERVICE_FIELDS)
+
+MARK_TAKEN_SCHEMA = _entity_service_schema(
     {
+        **ENTITY_SERVICE_FIELDS,
         vol.Optional(CONF_TAKEN_AT): cv.string,
         vol.Optional(CONF_SOURCE): cv.string,
         vol.Optional(CONF_NOTE): cv.string,
     }
 )
 
-SKIP_DOSE_SCHEMA = ENTITY_SERVICE_SCHEMA.extend(
+SKIP_DOSE_SCHEMA = _entity_service_schema(
     {
+        **ENTITY_SERVICE_FIELDS,
         vol.Optional(CONF_REASON): cv.string,
         vol.Optional(CONF_SOURCE): cv.string,
     }
@@ -92,9 +103,8 @@ MEDICATION_SCHEMA = vol.Schema(
     }
 )
 
-UPDATE_MEDICATION_SCHEMA = vol.Schema(
+UPDATE_MEDICATION_SCHEMA = _entity_service_schema(
     {
-        vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
         vol.Optional(CONF_MEDICATION_ID): cv.string,
         vol.Optional(CONF_NAME): cv.string,
         vol.Optional(CONF_DOSE): cv.string,
@@ -110,11 +120,8 @@ UPDATE_MEDICATION_SCHEMA = vol.Schema(
     }
 )
 
-REMOVE_MEDICATION_SCHEMA = vol.Schema(
-    {
-        vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
-        vol.Optional(CONF_MEDICATION_ID): cv.string,
-    }
+REMOVE_MEDICATION_SCHEMA = _entity_service_schema(
+    {vol.Optional(CONF_MEDICATION_ID): cv.string}
 )
 
 
@@ -131,7 +138,7 @@ async def async_setup(hass: HomeAssistant, _: dict[str, Any]) -> bool:
             raise HomeAssistantError("Medication Tracker has no loaded config entry")
         return next(iter(coordinators.values()))
 
-    def medication_from_call(
+    async def medication_from_call(
         coordinator: MedicationTrackerCoordinator, call: ServiceCall
     ) -> MedicationDefinition:
         medication_id = call.data.get(CONF_MEDICATION_ID)
@@ -141,18 +148,19 @@ async def async_setup(hass: HomeAssistant, _: dict[str, Any]) -> bool:
                 raise HomeAssistantError(f"Medication not found: {medication_id}")
             return medication
 
-        entity_ids = call.data.get(ATTR_ENTITY_ID)
-        if isinstance(entity_ids, str):
-            entity_ids = [entity_ids]
-        if entity_ids:
-            medication = coordinator.medication_for_entity(entity_ids[0])
+        for entity_id in await async_entity_ids_from_call(hass, call):
+            medication = coordinator.medication_for_entity(entity_id)
             if medication is not None:
+                return medication
+            if medication := medication_from_entity_registry(
+                hass, coordinator, entity_id
+            ):
                 return medication
         raise HomeAssistantError("Provide a medication sensor entity or medication_id")
 
     async def async_mark_taken(call: ServiceCall) -> None:
         coordinator = await async_get_coordinator()
-        medication = medication_from_call(coordinator, call)
+        medication = await medication_from_call(coordinator, call)
         taken_at = parse_local_datetime(call.data.get(CONF_TAKEN_AT))
         await coordinator.async_mark_taken(
             medication,
@@ -164,14 +172,14 @@ async def async_setup(hass: HomeAssistant, _: dict[str, Any]) -> bool:
 
     async def async_undo_taken(call: ServiceCall) -> None:
         coordinator = await async_get_coordinator()
-        medication = medication_from_call(coordinator, call)
+        medication = await medication_from_call(coordinator, call)
         await coordinator.async_undo_taken(
             medication, scheduled_for=call.data.get(CONF_SCHEDULED_FOR)
         )
 
     async def async_skip_dose(call: ServiceCall) -> None:
         coordinator = await async_get_coordinator()
-        medication = medication_from_call(coordinator, call)
+        medication = await medication_from_call(coordinator, call)
         await coordinator.async_skip_dose(
             medication,
             scheduled_for=call.data.get(CONF_SCHEDULED_FOR),
@@ -187,7 +195,7 @@ async def async_setup(hass: HomeAssistant, _: dict[str, Any]) -> bool:
 
     async def async_update_medication(call: ServiceCall) -> None:
         coordinator = await async_get_coordinator()
-        existing = medication_from_call(coordinator, call)
+        existing = await medication_from_call(coordinator, call)
         data = dict(existing.to_dict())
         data.update(
             {key: value for key, value in call.data.items() if key != ATTR_ENTITY_ID}
@@ -201,7 +209,7 @@ async def async_setup(hass: HomeAssistant, _: dict[str, Any]) -> bool:
 
     async def async_remove_medication(call: ServiceCall) -> None:
         coordinator = await async_get_coordinator()
-        medication = medication_from_call(coordinator, call)
+        medication = await medication_from_call(coordinator, call)
         entity_id = medication.entity_id
         device_identifier = (DOMAIN, medication.id)
         await coordinator.async_remove_medication(medication.id)
@@ -311,6 +319,50 @@ def medication_from_service(
         created_at=data.get("created_at") or now,
         updated_at=now,
     )
+
+
+async def async_entity_ids_from_call(
+    hass: HomeAssistant, call: ServiceCall
+) -> list[str]:
+    """Extract entity ids from service data or Home Assistant target data."""
+    entity_ids = call.data.get(ATTR_ENTITY_ID)
+    if entity_ids:
+        if isinstance(entity_ids, str):
+            return [entity_ids]
+        return list(entity_ids)
+
+    target = call.data.get("target")
+    if isinstance(target, dict) and target.get(ATTR_ENTITY_ID):
+        target_entity_ids = target[ATTR_ENTITY_ID]
+        if isinstance(target_entity_ids, str):
+            return [target_entity_ids]
+        return list(target_entity_ids)
+
+    try:
+        try:
+            extracted = await service_helper.async_extract_entity_ids(call)
+        except TypeError:
+            extracted = await service_helper.async_extract_entity_ids(hass, call)
+    except (KeyError, ValueError):
+        return []
+    return list(extracted)
+
+
+def medication_from_entity_registry(
+    hass: HomeAssistant,
+    coordinator: MedicationTrackerCoordinator,
+    entity_id: str,
+) -> MedicationDefinition | None:
+    """Resolve a medication from a registered sensor or binary sensor entity."""
+    registry_entry = er.async_get(hass).async_get(entity_id)
+    if registry_entry is None or registry_entry.platform != DOMAIN:
+        return None
+
+    unique_id = registry_entry.unique_id
+    for suffix in ("_status", "_needs_attention"):
+        if unique_id.endswith(suffix):
+            return coordinator.store.get_medication(unique_id[: -len(suffix)])
+    return None
 
 
 async def _async_options_updated(
