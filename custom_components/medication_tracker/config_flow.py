@@ -70,7 +70,7 @@ class MedicationTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         """Initialize flow state."""
-        self._medication_data: dict[str, Any] = {}
+        self._schedule_type = SCHEDULE_DAILY
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -78,79 +78,43 @@ class MedicationTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Start the local Medication Tracker setup."""
         await self.async_set_unique_id("local")
         self._abort_if_unique_id_configured()
-        return await self.async_step_medication(user_input)
+        return await self.async_step_schedule(user_input)
+
+    async def async_step_schedule(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Choose the schedule type before showing schedule-specific fields."""
+        if user_input is not None:
+            self._schedule_type = user_input[CONF_SCHEDULE_TYPE]
+            return await self.async_step_medication()
+
+        return self.async_show_form(
+            step_id="schedule",
+            data_schema=_schedule_type_schema(),
+        )
 
     async def async_step_medication(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Collect the common medication fields."""
+        """Collect medication details for the selected schedule type."""
+        errors: dict[str, str] = {}
         if user_input is not None:
-            medication, errors = _normalize_common_input(user_input)
+            medication, errors = _normalize_medication_input(
+                user_input, self._schedule_type
+            )
             if not errors:
-                self._medication_data = medication
-                schedule_type = medication[CONF_SCHEDULE_TYPE]
-                if schedule_type in {SCHEDULE_WEEKDAYS, SCHEDULE_WEEKLY}:
-                    return await self.async_step_weekdays()
-                if schedule_type == SCHEDULE_CYCLE:
-                    return await self.async_step_cycle()
-                return self._create_config_entry(medication)
-        else:
-            errors = {}
+                return self.async_create_entry(
+                    title="Medication Tracker",
+                    data={"initial_medication": medication},
+                )
 
         return self.async_show_form(
             step_id="medication",
-            data_schema=_common_medication_schema(),
+            data_schema=_medication_schema(self._schedule_type),
             errors=errors,
-        )
-
-    async def async_step_weekdays(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Collect weekday schedule details only when needed."""
-        schedule_type = self._medication_data[CONF_SCHEDULE_TYPE]
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            weekdays = _normalize_weekdays(user_input.get(CONF_WEEKDAYS))
-            if not weekdays:
-                errors[CONF_WEEKDAYS] = "weekdays_required"
-            elif schedule_type == SCHEDULE_WEEKLY and len(weekdays) != 1:
-                errors[CONF_WEEKDAYS] = "one_weekday_required"
-            else:
-                self._medication_data[CONF_WEEKDAYS] = weekdays
-                return self._create_config_entry(self._medication_data)
-
-        return self.async_show_form(
-            step_id="weekdays",
-            data_schema=_weekday_schema(schedule_type),
-            errors=errors,
-        )
-
-    async def async_step_cycle(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Collect cycle details only for cycle schedules."""
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            if not user_input.get(CONF_CYCLE_START_DATE):
-                errors[CONF_CYCLE_START_DATE] = "required"
-            elif int(user_input.get(CONF_CYCLE_ON_DAYS, 0)) < 1:
-                errors[CONF_CYCLE_ON_DAYS] = "required"
-            else:
-                self._medication_data.update(
-                    {
-                        CONF_CYCLE_START_DATE: user_input.get(CONF_CYCLE_START_DATE),
-                        CONF_CYCLE_ON_DAYS: int(user_input[CONF_CYCLE_ON_DAYS]),
-                        CONF_CYCLE_OFF_DAYS: int(
-                            user_input.get(CONF_CYCLE_OFF_DAYS, 0)
-                        ),
-                    }
-                )
-                return self._create_config_entry(self._medication_data)
-
-        return self.async_show_form(
-            step_id="cycle",
-            data_schema=_cycle_schema(),
-            errors=errors,
+            description_placeholders={
+                "schedule_summary": _schedule_summary(self._schedule_type)
+            },
         )
 
     @staticmethod
@@ -161,13 +125,6 @@ class MedicationTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Return the options flow."""
         return MedicationTrackerOptionsFlow(config_entry)
 
-    def _create_config_entry(self, medication: dict[str, Any]) -> FlowResult:
-        """Create the config entry with the first medication."""
-        return self.async_create_entry(
-            title="Medication Tracker",
-            data={"initial_medication": medication},
-        )
-
 
 class MedicationTrackerOptionsFlow(config_entries.OptionsFlow):
     """Allow adding more medications from the options UI."""
@@ -175,118 +132,112 @@ class MedicationTrackerOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize flow state."""
         self.config_entry = config_entry
-        self._medication_data: dict[str, Any] = {}
+        self._schedule_type = SCHEDULE_DAILY
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Start adding another medication."""
-        return await self.async_step_medication(user_input)
+        return await self.async_step_schedule(user_input)
+
+    async def async_step_schedule(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Choose the schedule type before showing schedule-specific fields."""
+        if user_input is not None:
+            self._schedule_type = user_input[CONF_SCHEDULE_TYPE]
+            return await self.async_step_medication()
+
+        return self.async_show_form(
+            step_id="schedule",
+            data_schema=_schedule_type_schema(),
+        )
 
     async def async_step_medication(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Collect common medication fields."""
+        """Collect medication details for the selected schedule type."""
+        errors: dict[str, str] = {}
         if user_input is not None:
-            medication, errors = _normalize_common_input(user_input)
+            medication, errors = _normalize_medication_input(
+                user_input, self._schedule_type
+            )
             if not errors:
-                self._medication_data = medication
-                schedule_type = medication[CONF_SCHEDULE_TYPE]
-                if schedule_type in {SCHEDULE_WEEKDAYS, SCHEDULE_WEEKLY}:
-                    return await self.async_step_weekdays()
-                if schedule_type == SCHEDULE_CYCLE:
-                    return await self.async_step_cycle()
-                return self._create_options_entry(medication)
-        else:
-            errors = {}
+                options = dict(self.config_entry.options)
+                pending = list(options.get("pending_medications", []))
+                pending.append(medication)
+                options["pending_medications"] = pending
+                return self.async_create_entry(title="", data=options)
 
         return self.async_show_form(
             step_id="medication",
-            data_schema=_common_medication_schema(),
+            data_schema=_medication_schema(self._schedule_type),
             errors=errors,
             description_placeholders={
-                "services": "Existing medications can be edited or removed from service actions."
+                "schedule_summary": _schedule_summary(self._schedule_type),
+                "services": "Existing medications can be edited or removed from service actions.",
             },
         )
 
-    async def async_step_weekdays(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Collect weekday schedule details."""
-        schedule_type = self._medication_data[CONF_SCHEDULE_TYPE]
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            weekdays = _normalize_weekdays(user_input.get(CONF_WEEKDAYS))
-            if not weekdays:
-                errors[CONF_WEEKDAYS] = "weekdays_required"
-            elif schedule_type == SCHEDULE_WEEKLY and len(weekdays) != 1:
-                errors[CONF_WEEKDAYS] = "one_weekday_required"
-            else:
-                self._medication_data[CONF_WEEKDAYS] = weekdays
-                return self._create_options_entry(self._medication_data)
 
-        return self.async_show_form(
-            step_id="weekdays",
-            data_schema=_weekday_schema(schedule_type),
-            errors=errors,
-        )
-
-    async def async_step_cycle(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Collect cycle details."""
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            if not user_input.get(CONF_CYCLE_START_DATE):
-                errors[CONF_CYCLE_START_DATE] = "required"
-            elif int(user_input.get(CONF_CYCLE_ON_DAYS, 0)) < 1:
-                errors[CONF_CYCLE_ON_DAYS] = "required"
-            else:
-                self._medication_data.update(
-                    {
-                        CONF_CYCLE_START_DATE: user_input.get(CONF_CYCLE_START_DATE),
-                        CONF_CYCLE_ON_DAYS: int(user_input[CONF_CYCLE_ON_DAYS]),
-                        CONF_CYCLE_OFF_DAYS: int(
-                            user_input.get(CONF_CYCLE_OFF_DAYS, 0)
-                        ),
-                    }
-                )
-                return self._create_options_entry(self._medication_data)
-
-        return self.async_show_form(
-            step_id="cycle",
-            data_schema=_cycle_schema(),
-            errors=errors,
-        )
-
-    def _create_options_entry(self, medication: dict[str, Any]) -> FlowResult:
-        """Queue a medication for import by the loaded config entry."""
-        options = dict(self.config_entry.options)
-        pending = list(options.get("pending_medications", []))
-        pending.append(medication)
-        options["pending_medications"] = pending
-        return self.async_create_entry(title="", data=options)
-
-
-def _common_medication_schema() -> vol.Schema:
-    """Return the common medication form schema."""
+def _schedule_type_schema() -> vol.Schema:
+    """Return the first-step schedule type schema."""
     return vol.Schema(
         {
-            vol.Required(CONF_NAME): TextSelector(
-                TextSelectorConfig(type=TextSelectorType.TEXT)
-            ),
-            vol.Required(CONF_DOSE): TextSelector(
-                TextSelectorConfig(type=TextSelectorType.TEXT)
-            ),
             vol.Required(CONF_SCHEDULE_TYPE, default=SCHEDULE_DAILY): SelectSelector(
                 SelectSelectorConfig(
                     options=SCHEDULE_OPTIONS,
                     mode=SelectSelectorMode.DROPDOWN,
                 )
-            ),
-            vol.Required(CONF_DUE_TIMES, default="08:00"): TextSelector(
-                TextSelectorConfig(type=TextSelectorType.TEXT)
-            ),
+            )
+        }
+    )
+
+
+def _medication_schema(schedule_type: str) -> vol.Schema:
+    """Return the medication form schema for a selected schedule type."""
+    fields: dict = {
+        vol.Required(CONF_NAME): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.TEXT)
+        ),
+        vol.Required(CONF_DOSE): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.TEXT)
+        ),
+        vol.Required(CONF_DUE_TIMES, default="08:00"): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.TEXT)
+        ),
+    }
+
+    if schedule_type in {SCHEDULE_WEEKDAYS, SCHEDULE_WEEKLY}:
+        fields[vol.Required(CONF_WEEKDAYS)] = SelectSelector(
+            SelectSelectorConfig(
+                options=WEEKDAY_OPTIONS,
+                multiple=schedule_type == SCHEDULE_WEEKDAYS,
+                mode=SelectSelectorMode.LIST,
+            )
+        )
+
+    if schedule_type == SCHEDULE_CYCLE:
+        fields.update(
+            {
+                vol.Required(
+                    CONF_CYCLE_START_DATE, default=date.today().isoformat()
+                ): DateSelector(),
+                vol.Required(CONF_CYCLE_ON_DAYS, default=21): NumberSelector(
+                    NumberSelectorConfig(
+                        min=1, max=365, mode=NumberSelectorMode.BOX
+                    )
+                ),
+                vol.Required(CONF_CYCLE_OFF_DAYS, default=7): NumberSelector(
+                    NumberSelectorConfig(
+                        min=0, max=365, mode=NumberSelectorMode.BOX
+                    )
+                ),
+            }
+        )
+
+    fields.update(
+        {
             vol.Optional(
                 CONF_GRACE_PERIOD_MINUTES, default=DEFAULT_GRACE_PERIOD_MINUTES
             ): NumberSelector(
@@ -300,45 +251,13 @@ def _common_medication_schema() -> vol.Schema:
             ),
         }
     )
+    return vol.Schema(fields)
 
 
-def _weekday_schema(schedule_type: str) -> vol.Schema:
-    """Return a weekday form schema for weekly schedules."""
-    multiple = schedule_type == SCHEDULE_WEEKDAYS
-    return vol.Schema(
-        {
-            vol.Required(CONF_WEEKDAYS): SelectSelector(
-                SelectSelectorConfig(
-                    options=WEEKDAY_OPTIONS,
-                    multiple=multiple,
-                    mode=SelectSelectorMode.LIST,
-                )
-            )
-        }
-    )
-
-
-def _cycle_schema() -> vol.Schema:
-    """Return the cycle-only form schema."""
-    return vol.Schema(
-        {
-            vol.Required(
-                CONF_CYCLE_START_DATE, default=date.today().isoformat()
-            ): DateSelector(),
-            vol.Required(CONF_CYCLE_ON_DAYS, default=21): NumberSelector(
-                NumberSelectorConfig(min=1, max=365, mode=NumberSelectorMode.BOX)
-            ),
-            vol.Required(CONF_CYCLE_OFF_DAYS, default=7): NumberSelector(
-                NumberSelectorConfig(min=0, max=365, mode=NumberSelectorMode.BOX)
-            ),
-        }
-    )
-
-
-def _normalize_common_input(
-    user_input: dict[str, Any],
+def _normalize_medication_input(
+    user_input: dict[str, Any], schedule_type: str
 ) -> tuple[dict[str, Any], dict[str, str]]:
-    """Normalize the common medication form data."""
+    """Normalize medication form data to service-compatible data."""
     due_times = normalize_due_times(
         [
             part.strip()
@@ -350,16 +269,38 @@ def _normalize_common_input(
     if not due_times:
         errors[CONF_DUE_TIMES] = "invalid_time"
 
+    weekdays: list[int] = []
+    if schedule_type in {SCHEDULE_WEEKDAYS, SCHEDULE_WEEKLY}:
+        weekdays = _normalize_weekdays(user_input.get(CONF_WEEKDAYS))
+        if not weekdays:
+            errors[CONF_WEEKDAYS] = "weekdays_required"
+        elif schedule_type == SCHEDULE_WEEKLY and len(weekdays) != 1:
+            errors[CONF_WEEKDAYS] = "one_weekday_required"
+
+    cycle_start_date = None
+    cycle_on_days = None
+    cycle_off_days = None
+    if schedule_type == SCHEDULE_CYCLE:
+        cycle_start_date = user_input.get(CONF_CYCLE_START_DATE)
+        cycle_on_days = int(user_input.get(CONF_CYCLE_ON_DAYS, 0))
+        cycle_off_days = int(user_input.get(CONF_CYCLE_OFF_DAYS, 0))
+        if not cycle_start_date:
+            errors[CONF_CYCLE_START_DATE] = "required"
+        if cycle_on_days < 1:
+            errors[CONF_CYCLE_ON_DAYS] = "required"
+        if cycle_off_days < 0:
+            errors[CONF_CYCLE_OFF_DAYS] = "required"
+
     medication = {
         CONF_NAME: user_input[CONF_NAME],
         CONF_DOSE: user_input[CONF_DOSE],
-        CONF_SCHEDULE_TYPE: user_input[CONF_SCHEDULE_TYPE],
+        CONF_SCHEDULE_TYPE: schedule_type,
         CONF_DUE_TIMES: due_times,
         CONF_NOTES: user_input.get(CONF_NOTES),
-        CONF_WEEKDAYS: [],
-        CONF_CYCLE_START_DATE: None,
-        CONF_CYCLE_ON_DAYS: None,
-        CONF_CYCLE_OFF_DAYS: None,
+        CONF_WEEKDAYS: weekdays,
+        CONF_CYCLE_START_DATE: cycle_start_date,
+        CONF_CYCLE_ON_DAYS: cycle_on_days,
+        CONF_CYCLE_OFF_DAYS: cycle_off_days,
         CONF_GRACE_PERIOD_MINUTES: int(
             user_input.get(CONF_GRACE_PERIOD_MINUTES, DEFAULT_GRACE_PERIOD_MINUTES)
         ),
@@ -375,3 +316,15 @@ def _normalize_weekdays(value: Any) -> list[int]:
     if isinstance(value, list):
         return [int(day) for day in value]
     return [int(value)]
+
+
+def _schedule_summary(schedule_type: str) -> str:
+    """Return a short explanation for a selected schedule type."""
+    summaries = {
+        SCHEDULE_DAILY: "Every day: this medication is required every calendar day at the due time or times you enter.",
+        SCHEDULE_TIMES_PER_DAY: "Multiple times per day: this medication is required every day, with one dose for each due time.",
+        SCHEDULE_WEEKDAYS: "Specific weekdays: this medication is required only on the weekdays you choose.",
+        SCHEDULE_WEEKLY: "Once per week: this medication is required on one weekday each week.",
+        SCHEDULE_CYCLE: "Cycle based: this medication repeats blocks of active days and rest days. For example, 21 days on and 7 days off means doses are required for 21 days from the first active day, then not required for 7 days, then the pattern repeats.",
+    }
+    return summaries.get(schedule_type, "")

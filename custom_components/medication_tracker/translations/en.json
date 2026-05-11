@@ -2,33 +2,38 @@
   "title": "Medication Tracker",
   "config": {
     "step": {
+      "schedule": {
+        "title": "Choose the schedule type",
+        "description": "Choose how Medication Tracker decides whether this medication is required today.\n\nEvery day: required every calendar day.\nMultiple times per day: required every day, with one dose for each due time you enter.\nSpecific weekdays: required only on selected weekdays.\nOnce per week: required on one selected weekday each week.\nCycle based: repeats active and rest blocks, for example 21 days on and 7 days off.",
+        "data": {
+          "schedule_type": "Schedule type"
+        }
+      },
       "medication": {
         "title": "Add your first medication",
-        "description": "Start with the details everyone needs. Enter multiple due times as comma-separated HH:MM values, for example 08:00, 13:00, 20:00.",
+        "description": "{schedule_summary}\n\nEnter multiple due times as comma-separated HH:MM values, for example 08:00, 13:00, 20:00.",
         "data": {
           "name": "Medication name",
           "dose": "Dose or amount",
-          "schedule_type": "When is it needed?",
           "due_times": "Due time or times",
+          "weekdays": "Required weekdays",
+          "cycle_start_date": "First active day",
+          "cycle_on_days": "Active days",
+          "cycle_off_days": "Rest days",
           "grace_period_minutes": "Grace period before missed",
           "icon": "Medication icon",
           "notes": "Notes"
-        }
-      },
-      "weekdays": {
-        "title": "Choose the weekday schedule",
-        "description": "Pick the day or days this medication is required.",
-        "data": {
-          "weekdays": "Required weekdays"
-        }
-      },
-      "cycle": {
-        "title": "Set up the cycle",
-        "description": "These fields only apply to cycle schedules, such as 21 days on and 7 days off.",
-        "data": {
-          "cycle_start_date": "First active day",
-          "cycle_on_days": "Days on",
-          "cycle_off_days": "Days off"
+        },
+        "data_description": {
+          "dose": "The amount to take, such as 1 tablet, 10mg, or 2 puffs.",
+          "due_times": "Use 24-hour HH:MM times. Multiple times create multiple dose events each required day.",
+          "weekdays": "The medication is only required on the selected weekday or weekdays.",
+          "cycle_start_date": "The first day of an active part of the cycle. This anchors all future on/off calculations.",
+          "cycle_on_days": "How many active days in a row the medication is required.",
+          "cycle_off_days": "How many rest days in a row the medication is not required before the active block starts again.",
+          "grace_period_minutes": "How long after a due time the dose can remain due before it becomes missed.",
+          "icon": "Optional Material Design icon, for example mdi:pill.",
+          "notes": "Optional notes shown on the sensor attributes."
         }
       }
     },
@@ -44,33 +49,38 @@
   },
   "options": {
     "step": {
+      "schedule": {
+        "title": "Choose the schedule type",
+        "description": "Choose how Medication Tracker decides whether this medication is required today.\n\nEvery day: required every calendar day.\nMultiple times per day: required every day, with one dose for each due time you enter.\nSpecific weekdays: required only on selected weekdays.\nOnce per week: required on one selected weekday each week.\nCycle based: repeats active and rest blocks, for example 21 days on and 7 days off.",
+        "data": {
+          "schedule_type": "Schedule type"
+        }
+      },
       "medication": {
         "title": "Add another medication",
-        "description": "Start with the main details. {services}",
+        "description": "{schedule_summary}\n\nEnter multiple due times as comma-separated HH:MM values, for example 08:00, 13:00, 20:00.\n\n{services}",
         "data": {
           "name": "Medication name",
           "dose": "Dose or amount",
-          "schedule_type": "When is it needed?",
           "due_times": "Due time or times",
+          "weekdays": "Required weekdays",
+          "cycle_start_date": "First active day",
+          "cycle_on_days": "Active days",
+          "cycle_off_days": "Rest days",
           "grace_period_minutes": "Grace period before missed",
           "icon": "Medication icon",
           "notes": "Notes"
-        }
-      },
-      "weekdays": {
-        "title": "Choose the weekday schedule",
-        "description": "Pick the day or days this medication is required.",
-        "data": {
-          "weekdays": "Required weekdays"
-        }
-      },
-      "cycle": {
-        "title": "Set up the cycle",
-        "description": "These fields only apply to cycle schedules, such as 21 days on and 7 days off.",
-        "data": {
-          "cycle_start_date": "First active day",
-          "cycle_on_days": "Days on",
-          "cycle_off_days": "Days off"
+        },
+        "data_description": {
+          "dose": "The amount to take, such as 1 tablet, 10mg, or 2 puffs.",
+          "due_times": "Use 24-hour HH:MM times. Multiple times create multiple dose events each required day.",
+          "weekdays": "The medication is only required on the selected weekday or weekdays.",
+          "cycle_start_date": "The first day of an active part of the cycle. This anchors all future on/off calculations.",
+          "cycle_on_days": "How many active days in a row the medication is required.",
+          "cycle_off_days": "How many rest days in a row the medication is not required before the active block starts again.",
+          "grace_period_minutes": "How long after a due time the dose can remain due before it becomes missed.",
+          "icon": "Optional Material Design icon, for example mdi:pill.",
+          "notes": "Optional notes shown on the sensor attributes."
         }
       }
     },

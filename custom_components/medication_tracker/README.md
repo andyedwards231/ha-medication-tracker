@@ -19,7 +19,7 @@ No YAML setup, add-on, cloud API, or external app is required.
 
 ## Adding Medications
 
-The config flow creates the first medication. It starts with the common fields, then only shows extra weekday or cycle fields when that schedule type needs them. The options flow can add another medication. Service actions are the most flexible way to edit or remove existing medications.
+The config flow creates the first medication. It first asks which schedule type you want, then shows a second form tailored to that choice. For example, cycle start/on/off fields only appear after choosing **Cycle based**. The options flow can add another medication. Service actions are the most flexible way to edit or remove existing medications.
 
 ### Schedule Types
 
@@ -30,6 +30,8 @@ The config flow creates the first medication. It starts with the common fields, 
 - `cycle`
 
 Weekdays use Python weekday numbers: Monday is `0`, Sunday is `6`.
+
+Cycle schedules repeat active and rest blocks. A `cycle_start_date` is the first active day. `cycle_on_days` is the number of days when doses are required. `cycle_off_days` is the number of rest days when the medication is not required. For example, `21` active days and `7` rest days repeats a 28-day pattern.
 
 ### Examples
 
