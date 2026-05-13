@@ -19,7 +19,7 @@ No YAML setup, add-on, cloud API, or external app is required.
 
 ## Adding Medications
 
-The config flow creates the first medication. It first asks which schedule type you want, then shows a second form tailored to that choice. For example, cycle start/on/off fields only appear after choosing **Cycle based**. Each medication is created as a Home Assistant device with its own status, diagnostic sensors, and action buttons. The options flow can add another medication. Service actions are the most flexible way to edit or remove existing medications.
+The config flow creates the first medication. It first asks which schedule type you want, then shows a second form tailored to that choice. For example, cycle start/on/off fields only appear after choosing **Cycle based**. Each medication is created as a Home Assistant device with its own status, diagnostic sensors, and action buttons. Running the add flow again adds another medication to the existing Medication Tracker integration instead of creating a duplicate config entry. The options flow can also add another medication. Service actions are the most flexible way to edit or remove existing medications.
 
 ### Schedule Types
 

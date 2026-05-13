@@ -44,7 +44,8 @@
       "one_weekday_required": "Choose exactly one weekday for a once-per-week medication."
     },
     "abort": {
-      "already_configured": "Medication Tracker is already configured."
+      "already_configured": "Medication Tracker is already configured.",
+      "medication_added": "Medication added."
     }
   },
   "options": {

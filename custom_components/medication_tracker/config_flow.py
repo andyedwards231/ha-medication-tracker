@@ -76,8 +76,6 @@ class MedicationTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Start the local Medication Tracker setup."""
-        await self.async_set_unique_id("local")
-        self._abort_if_unique_id_configured()
         return await self.async_step_schedule(user_input)
 
     async def async_step_schedule(
@@ -103,6 +101,9 @@ class MedicationTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 user_input, self._schedule_type
             )
             if not errors:
+                if existing_entry := _existing_entry(self):
+                    _queue_medication_for_entry(self.hass, existing_entry, medication)
+                    return self.async_abort(reason="medication_added")
                 return self.async_create_entry(
                     title="Medication Tracker",
                     data={"initial_medication": medication},
@@ -192,6 +193,25 @@ def _schedule_type_schema() -> vol.Schema:
             )
         }
     )
+
+
+def _existing_entry(
+    flow: config_entries.ConfigFlow,
+) -> config_entries.ConfigEntry | None:
+    """Return the existing Medication Tracker entry, if one exists."""
+    entries = flow._async_current_entries()
+    return entries[0] if entries else None
+
+
+def _queue_medication_for_entry(
+    hass, entry: config_entries.ConfigEntry, medication: dict[str, Any]
+) -> None:
+    """Queue a medication to be imported by the loaded config entry."""
+    options = dict(entry.options)
+    pending = list(options.get("pending_medications", []))
+    pending.append(medication)
+    options["pending_medications"] = pending
+    hass.config_entries.async_update_entry(entry, options=options)
 
 
 def _medication_schema(schedule_type: str) -> vol.Schema:
