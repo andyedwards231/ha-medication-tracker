@@ -10,7 +10,7 @@
         }
       },
       "medication": {
-        "title": "Add your first medication",
+        "title": "Add medication",
         "description": "{schedule_summary}\n\nEnter multiple due times as comma-separated HH:MM values, for example 08:00, 13:00, 20:00.",
         "data": {
           "name": "Medication name",
@@ -58,7 +58,7 @@
         }
       },
       "medication": {
-        "title": "Add another medication",
+        "title": "Add medication",
         "description": "{schedule_summary}\n\nEnter multiple due times as comma-separated HH:MM values, for example 08:00, 13:00, 20:00.\n\n{services}",
         "data": {
           "name": "Medication name",
