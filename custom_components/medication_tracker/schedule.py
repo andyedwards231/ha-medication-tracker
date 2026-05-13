@@ -362,6 +362,7 @@ def compute_medication_status(
         first_missed,
         first_due_now,
         next_future_today,
+        local_day,
     )
 
     attributes: dict[str, Any] = {
@@ -403,6 +404,7 @@ def dynamic_state(
     first_missed: datetime | None,
     first_due_now: datetime | None,
     next_future_today: datetime | None,
+    local_day: date,
 ) -> str:
     """Return a friendly, dynamic state string."""
     if base_state == STATUS_MISSED:
@@ -415,8 +417,10 @@ def dynamic_state(
         return STATUS_DUE_NOW
     if base_state == STATUS_PARTIALLY_TAKEN:
         taken = _format_local_datetime_string(last_taken)
-        due = _format_local_time(next_due or next_future_today)
+        due = _format_next_due_for_status(next_due or next_future_today, local_day)
         if taken and due:
+            if due == "tomorrow":
+                return f"Taken at {taken}, next dose tomorrow"
             return f"Taken at {taken}, next at {due}"
         if taken:
             return f"Taken at {taken}"
@@ -428,12 +432,16 @@ def dynamic_state(
         return f"Take later today at {due}" if due else STATUS_TAKE_LATER_TODAY
     if base_state == STATUS_TAKEN_TODAY:
         taken = _format_local_datetime_string(last_taken)
-        due = _format_local_time(next_due)
+        due = _format_next_due_for_status(next_due, local_day)
         if taken and due:
+            if due == "tomorrow":
+                return f"Taken at {taken}, next dose tomorrow"
             return f"Taken at {taken}, next at {due}"
         if taken:
             return f"Taken at {taken}"
         if due:
+            if due == "tomorrow":
+                return "Taken today, next dose tomorrow"
             return f"Taken today, next at {due}"
         return STATUS_TAKEN_TODAY
     return base_state
@@ -452,3 +460,13 @@ def _format_local_time(value: datetime | None) -> str | None:
     if value is None:
         return None
     return dt_util.as_local(value).strftime("%H:%M")
+
+
+def _format_next_due_for_status(value: datetime | None, local_day: date) -> str | None:
+    """Format the next dose for compact status text."""
+    if value is None:
+        return None
+    local_value = dt_util.as_local(value)
+    if local_value.date() == local_day + timedelta(days=1):
+        return "tomorrow"
+    return local_value.strftime("%H:%M")

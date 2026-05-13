@@ -88,7 +88,7 @@ The main status sensor can show values such as:
 - `Take later today at 20:00`
 - `Taken at 10:05`
 - `Taken at 10:05, next at 20:00`
-- `Taken at 10:05, next at 08:00`
+- `Taken at 10:05, next dose tomorrow`
 - `Not required today`
 
 Use the `base_status` diagnostic sensor if you need a stable value for automations.
