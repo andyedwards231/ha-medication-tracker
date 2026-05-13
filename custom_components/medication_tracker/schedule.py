@@ -428,7 +428,14 @@ def dynamic_state(
         return f"Take later today at {due}" if due else STATUS_TAKE_LATER_TODAY
     if base_state == STATUS_TAKEN_TODAY:
         taken = _format_local_datetime_string(last_taken)
-        return f"Taken at {taken}" if taken else STATUS_TAKEN_TODAY
+        due = _format_local_time(next_due)
+        if taken and due:
+            return f"Taken at {taken}, next at {due}"
+        if taken:
+            return f"Taken at {taken}"
+        if due:
+            return f"Taken today, next at {due}"
+        return STATUS_TAKEN_TODAY
     return base_state
 
 
