@@ -10,6 +10,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     DOSE_STATUS_MISSED,
+    DOSE_STATUS_PENDING,
     DOSE_STATUS_SKIPPED,
     DOSE_STATUS_TAKEN,
     SCHEDULE_CYCLE,
