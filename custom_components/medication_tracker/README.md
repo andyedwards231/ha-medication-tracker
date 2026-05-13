@@ -257,24 +257,142 @@ They also expose actions for mark taken, skip dose, and mark not taken.
 
 ## Dashboard Example
 
+This example uses only built-in Lovelace cards. Replace the three medication
+sensor entities and button entities with your own.
+
+Remove any row or button group you do not need.
+
 ```yaml
-type: markdown
-content: |
-  {% set meds = states.sensor
-    | selectattr('attributes.medication_name', 'defined')
-    | selectattr('attributes.base_status', 'defined')
-    | list %}
+type: vertical-stack
+cards:
+  - type: markdown
+    title: Medication
+    content: |
+      {% set entities = expand(
+        'sensor.vitamin_d',
+        'sensor.inhaler',
+        'sensor.antibiotic'
+      ) %}
+      | | Medication | Status | Today |
+      |---|---|---|---|
+      {% for med in entities if med.state not in ['unknown', 'unavailable'] %}
+      {% set status = med.attributes.base_status %}
+      {% set icon =
+        '⚠️' if status == 'Missed' else
+        '💊' if status == 'Due now' else
+        '✅' if status == 'Taken today' else
+        '◐' if status == 'Partially taken' else
+        '🕒' if status == 'Take later today' else
+        '−' if status == 'Not required today' else
+        '?' %}
+      {% set taken = med.attributes.doses_taken_today | default(0) %}
+      {% set due = med.attributes.doses_due_today | default(0) %}
+      {% set missed = med.attributes.missed_doses_today | default(0) %}
+      {% set skipped = med.attributes.skipped_doses_today | default(0) %}
+      {% set next_due = med.attributes.next_due %}
+      | {{ icon }} | **{{ med.attributes.medication_name or med.name }}**<br>{{ med.attributes.dose or '' }} | {{ med.state }}{% if next_due %}<br>Next: {{ as_timestamp(next_due) | timestamp_custom('%H:%M', true) }}{% endif %} | {{ taken }}/{{ due }}{% if missed | int > 0 %}<br>Missed: {{ missed }}{% endif %}{% if skipped | int > 0 %}<br>Skipped: {{ skipped }}{% endif %} |
+      {% endfor %}
 
-  {% for med in meds %}
-  ## {{ med.attributes.medication_name }}
-  **Status:** {{ med.state }}
-  **Dose:** {{ med.attributes.dose }}
-  **Next due:** {{ med.attributes.next_due or 'None today' }}
-  **Taken today:** {{ med.attributes.doses_taken_today }}/{{ med.attributes.doses_due_today }}
-  **Missed:** {{ med.attributes.missed_doses_today }}
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: button
+        entity: button.vitamin_d_mark_taken
+        name: Vitamin D
+        icon: mdi:check
+        show_state: false
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.vitamin_d_mark_taken
+      - type: button
+        entity: button.vitamin_d_skip_dose
+        name: Skip
+        icon: mdi:skip-next
+        show_state: false
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.vitamin_d_skip_dose
+      - type: button
+        entity: button.vitamin_d_mark_not_taken
+        name: Undo
+        icon: mdi:undo
+        show_state: false
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.vitamin_d_mark_not_taken
 
-  {% endfor %}
+      - type: button
+        entity: button.inhaler_mark_taken
+        name: Inhaler
+        icon: mdi:check
+        show_state: false
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.inhaler_mark_taken
+      - type: button
+        entity: button.inhaler_skip_dose
+        name: Skip
+        icon: mdi:skip-next
+        show_state: false
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.inhaler_skip_dose
+      - type: button
+        entity: button.inhaler_mark_not_taken
+        name: Undo
+        icon: mdi:undo
+        show_state: false
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.inhaler_mark_not_taken
+
+      - type: button
+        entity: button.antibiotic_mark_taken
+        name: Antibiotic
+        icon: mdi:check
+        show_state: false
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.antibiotic_mark_taken
+      - type: button
+        entity: button.antibiotic_skip_dose
+        name: Skip
+        icon: mdi:skip-next
+        show_state: false
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.antibiotic_skip_dose
+      - type: button
+        entity: button.antibiotic_mark_not_taken
+        name: Undo
+        icon: mdi:undo
+        show_state: false
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.antibiotic_mark_not_taken
 ```
+
+The status table uses each medication's main sensor. The buttons use the
+medication button entities created by the integration.
 
 ## Storage
 
