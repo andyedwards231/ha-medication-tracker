@@ -210,15 +210,16 @@ async def async_setup(hass: HomeAssistant, _: dict[str, Any]) -> bool:
     async def async_remove_medication(call: ServiceCall) -> None:
         coordinator = await async_get_coordinator()
         medication = await medication_from_call(coordinator, call)
-        entity_id = medication.entity_id
         device_identifier = (DOMAIN, medication.id)
         await coordinator.async_remove_medication(medication.id)
 
         entity_registry = er.async_get(hass)
-        if entity_id:
-            registry_entry = entity_registry.async_get(entity_id)
-            if registry_entry:
-                entity_registry.async_remove(entity_id)
+        for registry_entry in list(entity_registry.entities.values()):
+            if (
+                registry_entry.platform == DOMAIN
+                and registry_entry.unique_id.startswith(f"{medication.id}_")
+            ):
+                entity_registry.async_remove(registry_entry.entity_id)
 
         device_registry = dr.async_get(hass)
         device = device_registry.async_get_device(identifiers={device_identifier})
@@ -359,9 +360,18 @@ def medication_from_entity_registry(
         return None
 
     unique_id = registry_entry.unique_id
-    for suffix in ("_status", "_needs_attention"):
+    for suffix in (
+        "_status",
+        "_needs_attention",
+        "_mark_taken",
+        "_skip_dose",
+        "_mark_not_taken",
+    ):
         if unique_id.endswith(suffix):
             return coordinator.store.get_medication(unique_id[: -len(suffix)])
+    for medication_id in coordinator.store.medications:
+        if unique_id.startswith(f"{medication_id}_"):
+            return coordinator.store.get_medication(medication_id)
     return None
 
 

@@ -19,7 +19,7 @@ No YAML setup, add-on, cloud API, or external app is required.
 
 ## Adding Medications
 
-The config flow creates the first medication. It first asks which schedule type you want, then shows a second form tailored to that choice. For example, cycle start/on/off fields only appear after choosing **Cycle based**. The options flow can add another medication. Service actions are the most flexible way to edit or remove existing medications.
+The config flow creates the first medication. It first asks which schedule type you want, then shows a second form tailored to that choice. For example, cycle start/on/off fields only appear after choosing **Cycle based**. Each medication is created as a Home Assistant device with its own status, diagnostic sensors, and action buttons. The options flow can add another medication. Service actions are the most flexible way to edit or remove existing medications.
 
 ### Schedule Types
 
@@ -199,7 +199,17 @@ Each medication sensor exposes:
 - `grace_period_minutes`
 - `notes`
 
-The integration also creates a binary sensor per medication named **Needs attention**, which is on when the medication is due or missed.
+The integration also creates a binary sensor per medication named **Needs attention**, which is on when the medication is due or missed. The main attributes are also exposed as separate diagnostic sensors on the medication device so they are easier to use in dashboards, automations, and the device page.
+
+## Button Entities
+
+Each medication device includes these button entities:
+
+- **Mark taken**: marks the next relevant due or pending dose as taken.
+- **Skip dose**: marks the next relevant dose as intentionally skipped.
+- **Mark not taken**: undoes the latest taken record for that medication.
+
+These buttons call the same local service actions as automations and dashboards, so dose history and events stay consistent.
 
 ## Events
 
@@ -273,8 +283,10 @@ These are backed by the normal Home Assistant events above. Event automations ar
 Medication devices also expose a UI-friendly action:
 
 - Mark medication as taken
+- Skip medication dose
+- Mark medication as not taken
 
-This device action calls `medication_tracker.mark_taken` for the selected medication. It is intended for simple automations where you want to choose the medication device in the visual editor and mark the next relevant dose as taken.
+These device actions call the matching Medication Tracker services for the selected medication. They are intended for simple automations where you want to choose the medication device in the visual editor.
 
 ## Lovelace Markdown Card
 

@@ -18,5 +18,18 @@
     "update_medication": {
       "service": "mdi:pencil"
     }
+  },
+  "entities": {
+    "button": {
+      "mark_taken": {
+        "default": "mdi:pill"
+      },
+      "skip_dose": {
+        "default": "mdi:skip-next"
+      },
+      "mark_not_taken": {
+        "default": "mdi:undo"
+      }
+    }
   }
 }

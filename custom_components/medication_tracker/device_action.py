@@ -12,6 +12,8 @@ from homeassistant.helpers import device_registry as dr
 
 from .const import (
     ACTION_MARK_TAKEN,
+    ACTION_MARK_NOT_TAKEN,
+    ACTION_SKIP_DOSE,
     ACTION_TYPES,
     CONF_MEDICATION_ID,
     CONF_NOTE,
@@ -41,8 +43,9 @@ async def async_get_actions(
             CONF_PLATFORM: "device",
             CONF_DOMAIN: DOMAIN,
             CONF_DEVICE_ID: device_id,
-            CONF_TYPE: ACTION_MARK_TAKEN,
+            CONF_TYPE: action_type,
         }
+        for action_type in sorted(ACTION_TYPES)
     ]
 
 
@@ -57,7 +60,7 @@ async def async_call_action_from_config(
     if medication_id is None:
         raise HomeAssistantError("Medication device not found")
 
-    if config[CONF_TYPE] != ACTION_MARK_TAKEN:
+    if config[CONF_TYPE] not in ACTION_TYPES:
         raise HomeAssistantError(f"Unsupported medication action: {config[CONF_TYPE]}")
 
     service_data = {
@@ -69,11 +72,20 @@ async def async_call_action_from_config(
 
     await hass.services.async_call(
         DOMAIN,
-        ACTION_MARK_TAKEN,
+        _service_for_action(config[CONF_TYPE]),
         service_data,
         blocking=True,
         context=context,
     )
+
+
+def _service_for_action(action_type: str) -> str:
+    """Return the service for a device action type."""
+    if action_type == ACTION_SKIP_DOSE:
+        return "skip_dose"
+    if action_type == ACTION_MARK_NOT_TAKEN:
+        return "undo_taken"
+    return ACTION_MARK_TAKEN
 
 
 def _medication_id_for_device(hass: HomeAssistant, device_id: str) -> str | None:

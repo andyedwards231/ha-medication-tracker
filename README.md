@@ -32,6 +32,7 @@ Restart Home Assistant, then add the integration from **Settings > Devices & ser
 
 ## Features
 
+- Each medication appears as a Home Assistant device with status, diagnostic sensors, and action buttons.
 - Local-only storage using Home Assistant storage helpers.
 - No YAML setup, add-on, external app, or cloud API.
 - Config flow support.
@@ -41,7 +42,7 @@ Restart Home Assistant, then add the integration from **Settings > Devices & ser
 - Individual dose event history with taken, skipped, missed, and pending states.
 - 90-day default history retention.
 - Event-based automation support.
-- Device triggers and a device action for UI-friendly automation setup.
+- Device triggers, device actions, and button entities for UI-friendly automation setup.
 - Local brand icon and logo for Home Assistant and HACS.
 
 Full usage documentation is in [custom_components/medication_tracker/README.md](custom_components/medication_tracker/README.md).

@@ -7,7 +7,7 @@ from homeassistant.const import Platform
 DOMAIN = "medication_tracker"
 NAME = "Medication Tracker"
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
 
 CONF_MEDICATION_ID = "medication_id"
 CONF_DOSE = "dose"
@@ -89,5 +89,7 @@ EVENT_TYPES = {
 TRIGGER_TYPES = set(EVENT_TYPES)
 
 ACTION_MARK_TAKEN = "mark_taken"
+ACTION_SKIP_DOSE = "skip_dose"
+ACTION_MARK_NOT_TAKEN = "mark_not_taken"
 
-ACTION_TYPES = {ACTION_MARK_TAKEN}
+ACTION_TYPES = {ACTION_MARK_TAKEN, ACTION_SKIP_DOSE, ACTION_MARK_NOT_TAKEN}

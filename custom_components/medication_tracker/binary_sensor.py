@@ -12,6 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DATA_COORDINATORS, DOMAIN, SIGNAL_MEDICATIONS_UPDATED
 from .coordinator import MedicationTrackerCoordinator
 from .models import MedicationDefinition
+from .sensor import medication_device_info
 
 
 async def async_setup_entry(
@@ -87,10 +88,4 @@ class MedicationDueBinarySensor(
     @property
     def device_info(self) -> dict:
         """Return the medication device info."""
-        medication = self.medication
-        return {
-            "identifiers": {(DOMAIN, self.medication_id)},
-            "name": medication.name if medication else self.medication_id,
-            "manufacturer": "Local",
-            "model": "Medication schedule",
-        }
+        return medication_device_info(self.medication_id, self.medication)

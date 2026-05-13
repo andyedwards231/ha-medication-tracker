@@ -101,7 +101,9 @@
       "not_required_today": "Medication is not required today"
     },
     "action_type": {
-      "mark_taken": "Mark medication as taken"
+      "mark_not_taken": "Mark medication as not taken",
+      "mark_taken": "Mark medication as taken",
+      "skip_dose": "Skip medication dose"
     }
   },
   "services": {
