@@ -226,17 +226,24 @@ def find_target_schedule(
 
     today = dt_util.as_local(now).date()
     today_schedules = scheduled_datetimes_for_date(hass, medication, today)
-    unhandled_today = [
+    actionable_today = [
         scheduled
         for scheduled in today_schedules
-        if not event_is_handled(event_for_schedule(medication.id, scheduled, events))
+        if dose_can_be_actioned(
+            event_for_schedule(medication.id, scheduled, events)
+        )
     ]
-    due = [scheduled for scheduled in unhandled_today if scheduled <= now]
+    due = [scheduled for scheduled in actionable_today if scheduled <= now]
     if due:
         return min(due)
-    if unhandled_today:
-        return min(unhandled_today)
+    if actionable_today:
+        return min(actionable_today)
     return next_due_datetime(hass, medication, events, now, search_days=370)
+
+
+def dose_can_be_actioned(event: DoseEvent | None) -> bool:
+    """Return true if a dose can still be taken or skipped."""
+    return event is None or event.status in {DOSE_STATUS_MISSED, DOSE_STATUS_PENDING}
 
 
 def latest_taken_event(
@@ -292,55 +299,74 @@ def compute_medication_status(
 
     missed = 0
     skipped = 0
-    handled = 0
+    terminal_handled = 0
     due_now = False
     future_unhandled = False
+    first_missed: datetime | None = None
+    first_due_now: datetime | None = None
+    next_future_today: datetime | None = None
 
     for scheduled in today_schedules:
         event = event_for_schedule(medication.id, scheduled, events)
         if event and event.status == DOSE_STATUS_TAKEN:
-            handled += 1
+            terminal_handled += 1
             continue
         if event and event.status == DOSE_STATUS_SKIPPED:
             skipped += 1
-            handled += 1
+            terminal_handled += 1
             continue
         if event and event.status == DOSE_STATUS_MISSED:
             missed += 1
-            handled += 1
+            terminal_handled += 1
+            first_missed = first_missed or scheduled
             continue
 
         missed_at = scheduled + timedelta(minutes=medication.grace_period_minutes)
         if now > missed_at:
             missed += 1
+            terminal_handled += 1
+            first_missed = first_missed or scheduled
         elif scheduled <= now:
             due_now = True
+            first_due_now = first_due_now or scheduled
         else:
             future_unhandled = True
+            next_future_today = next_future_today or scheduled
 
     doses_due_today = len(today_schedules)
     doses_taken_today = len(taken_events)
-    remaining = max(doses_due_today - handled - missed, 0)
+    remaining = max(doses_due_today - terminal_handled, 0)
 
     next_due = next_due_datetime(hass, medication, events, now)
 
     if not required_today:
-        state = STATUS_NOT_REQUIRED_TODAY
+        base_state = STATUS_NOT_REQUIRED_TODAY
     elif missed > 0:
-        state = STATUS_MISSED
+        base_state = STATUS_MISSED
     elif due_now:
-        state = STATUS_DUE_NOW
-    elif handled > 0 and (future_unhandled or remaining > 0):
-        state = STATUS_PARTIALLY_TAKEN
+        base_state = STATUS_DUE_NOW
+    elif terminal_handled > 0 and (future_unhandled or remaining > 0):
+        base_state = STATUS_PARTIALLY_TAKEN
     elif future_unhandled:
-        state = STATUS_TAKE_LATER_TODAY
-    elif doses_due_today > 0 and handled == doses_due_today:
-        state = STATUS_TAKEN_TODAY
+        base_state = STATUS_TAKE_LATER_TODAY
+    elif doses_due_today > 0 and terminal_handled == doses_due_today:
+        base_state = STATUS_TAKEN_TODAY
     else:
-        state = STATUS_UNKNOWN
+        base_state = STATUS_UNKNOWN
+
+    state = dynamic_state(
+        base_state,
+        last_taken,
+        next_due,
+        first_missed,
+        first_due_now,
+        next_future_today,
+    )
 
     attributes: dict[str, Any] = {
         "medication_name": medication.name,
+        "base_status": base_state,
+        "display_status": state,
         "dose": medication.dose,
         "schedule_type": medication.schedule_type,
         "due_times": normalize_due_times(medication.due_times),
@@ -365,5 +391,56 @@ def compute_medication_status(
         medication_id=medication.id,
         state=state,
         attributes=attributes,
-        is_due_or_missed=state in {STATUS_DUE_NOW, STATUS_MISSED},
+        is_due_or_missed=base_state in {STATUS_DUE_NOW, STATUS_MISSED},
     )
+
+
+def dynamic_state(
+    base_state: str,
+    last_taken: str | None,
+    next_due: datetime | None,
+    first_missed: datetime | None,
+    first_due_now: datetime | None,
+    next_future_today: datetime | None,
+) -> str:
+    """Return a friendly, dynamic state string."""
+    if base_state == STATUS_MISSED:
+        if first_missed is not None:
+            return f"Missed at {_format_local_time(first_missed)}"
+        return STATUS_MISSED
+    if base_state == STATUS_DUE_NOW:
+        if first_due_now is not None:
+            return f"Due now ({_format_local_time(first_due_now)})"
+        return STATUS_DUE_NOW
+    if base_state == STATUS_PARTIALLY_TAKEN:
+        taken = _format_local_datetime_string(last_taken)
+        due = _format_local_time(next_due or next_future_today)
+        if taken and due:
+            return f"Taken at {taken}, next at {due}"
+        if taken:
+            return f"Taken at {taken}"
+        if due:
+            return f"Partially taken, next at {due}"
+        return STATUS_PARTIALLY_TAKEN
+    if base_state == STATUS_TAKE_LATER_TODAY:
+        due = _format_local_time(next_due or next_future_today)
+        return f"Take later today at {due}" if due else STATUS_TAKE_LATER_TODAY
+    if base_state == STATUS_TAKEN_TODAY:
+        taken = _format_local_datetime_string(last_taken)
+        return f"Taken at {taken}" if taken else STATUS_TAKEN_TODAY
+    return base_state
+
+
+def _format_local_datetime_string(value: str | None) -> str | None:
+    """Format an ISO datetime as local HH:MM."""
+    parsed = parse_local_datetime(value)
+    if parsed is None:
+        return None
+    return parsed.strftime("%H:%M")
+
+
+def _format_local_time(value: datetime | None) -> str | None:
+    """Format a datetime as local HH:MM."""
+    if value is None:
+        return None
+    return dt_util.as_local(value).strftime("%H:%M")

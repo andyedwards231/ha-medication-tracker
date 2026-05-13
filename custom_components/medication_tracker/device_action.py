@@ -17,6 +17,7 @@ from .const import (
     ACTION_TYPES,
     CONF_MEDICATION_ID,
     CONF_NOTE,
+    CONF_REASON,
     CONF_SOURCE,
     DOMAIN,
 )
@@ -63,12 +64,7 @@ async def async_call_action_from_config(
     if config[CONF_TYPE] not in ACTION_TYPES:
         raise HomeAssistantError(f"Unsupported medication action: {config[CONF_TYPE]}")
 
-    service_data = {
-        CONF_MEDICATION_ID: medication_id,
-        CONF_SOURCE: config.get(CONF_SOURCE, "Automation"),
-    }
-    if note := config.get(CONF_NOTE):
-        service_data[CONF_NOTE] = note
+    service_data = _service_data_for_action(config, medication_id)
 
     await hass.services.async_call(
         DOMAIN,
@@ -86,6 +82,22 @@ def _service_for_action(action_type: str) -> str:
     if action_type == ACTION_MARK_NOT_TAKEN:
         return "undo_taken"
     return ACTION_MARK_TAKEN
+
+
+def _service_data_for_action(config: dict, medication_id: str) -> dict:
+    """Return service data for a device action."""
+    if config[CONF_TYPE] == ACTION_MARK_NOT_TAKEN:
+        return {CONF_MEDICATION_ID: medication_id}
+
+    service_data = {
+        CONF_MEDICATION_ID: medication_id,
+        CONF_SOURCE: config.get(CONF_SOURCE, "Automation"),
+    }
+    if note := config.get(CONF_NOTE):
+        service_data[
+            CONF_REASON if config[CONF_TYPE] == ACTION_SKIP_DOSE else CONF_NOTE
+        ] = note
+    return service_data
 
 
 def _medication_id_for_device(hass: HomeAssistant, device_id: str) -> str | None:

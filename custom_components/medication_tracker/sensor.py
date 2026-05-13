@@ -31,6 +31,18 @@ class MedicationSensorDescription:
 
 ATTRIBUTE_SENSORS: tuple[MedicationSensorDescription, ...] = (
     MedicationSensorDescription(
+        "base_status",
+        "Base status",
+        "mdi:state-machine",
+        lambda attrs: attrs.get("base_status"),
+    ),
+    MedicationSensorDescription(
+        "display_status",
+        "Display status",
+        "mdi:message-text-clock-outline",
+        lambda attrs: attrs.get("display_status"),
+    ),
+    MedicationSensorDescription(
         "medication_name",
         "Medication name",
         "mdi:label",

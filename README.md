@@ -32,7 +32,7 @@ Restart Home Assistant, then add the integration from **Settings > Devices & ser
 
 ## Features
 
-- Each medication appears as a Home Assistant device with status, diagnostic sensors, and action buttons.
+- Each medication appears as a Home Assistant device with dynamic status, diagnostic sensors, and action buttons.
 - Local-only storage using Home Assistant storage helpers.
 - No YAML setup, add-on, external app, or cloud API.
 - Config flow support.

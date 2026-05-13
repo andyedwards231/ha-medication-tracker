@@ -165,6 +165,16 @@ data:
 - `Taken today`: All of today's scheduled doses are handled.
 - `Unknown`: The integration cannot determine a better status.
 
+The main status sensor may include timing detail in its state, for example:
+
+- `Missed at 08:00`
+- `Due now (13:00)`
+- `Take later today at 20:00`
+- `Taken at 10:05`
+- `Taken at 10:05, next at 20:00`
+
+The stable priority/status value is also exposed as `base_status`, so dashboards and automations can still use the simple status names if needed.
+
 State priority is:
 
 1. `Not required today`
@@ -182,6 +192,8 @@ Skipped doses count as handled for the daily completion state, but are exposed s
 Each medication sensor exposes:
 
 - `medication_name`
+- `base_status`
+- `display_status`
 - `dose`
 - `schedule_type`
 - `due_times`
@@ -205,8 +217,8 @@ The integration also creates a binary sensor per medication named **Needs attent
 
 Each medication device includes these button entities:
 
-- **Mark taken**: marks the next relevant due or pending dose as taken.
-- **Skip dose**: marks the next relevant dose as intentionally skipped.
+- **Mark taken**: marks the next relevant due, missed, or pending dose as taken.
+- **Skip dose**: marks the next relevant due, missed, or pending dose as intentionally skipped.
 - **Mark not taken**: undoes the latest taken record for that medication.
 
 These buttons call the same local service actions as automations and dashboards, so dose history and events stay consistent.
