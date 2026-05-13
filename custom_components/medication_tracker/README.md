@@ -1,195 +1,98 @@
 # Medication Tracker
 
-Local-only Home Assistant custom integration for tracking medication schedules and dose history.
+Local-only Home Assistant custom integration for tracking medication schedules, reminders, action buttons, and dose history.
 
 ## Installation
 
-1. Copy this folder to:
+### HACS
+
+1. Open HACS.
+2. Go to **Integrations**.
+3. Add this custom repository:
 
    ```text
-   <config>/custom_components/medication_tracker
+   https://github.com/andyedwards231/ha-medication-tracker
    ```
 
-2. Restart Home Assistant.
-3. Go to **Settings > Devices & services > Add integration**.
-4. Search for **Medication Tracker**.
-5. Create the first medication in the config flow.
+4. Choose category **Integration**.
+5. Install **Medication Tracker**.
+6. Restart Home Assistant.
+7. Go to **Settings > Devices & services > Add integration**.
+8. Search for **Medication Tracker**.
 
-No YAML setup, add-on, cloud API, or external app is required.
+### Manual
+
+Copy this folder to:
+
+```text
+<config>/custom_components/medication_tracker
+```
+
+Restart Home Assistant, then add the integration from **Settings > Devices & services**.
+
+## Updating
+
+Update through HACS, then restart Home Assistant. If the UI still shows old wording or old entities after updating, restart Home Assistant again and reload the browser. Home Assistant caches integration metadata during startup.
 
 ## Adding Medications
 
-The config flow creates the first medication. It first asks which schedule type you want, then shows a second form tailored to that choice. For example, cycle start/on/off fields only appear after choosing **Cycle based**. Each medication is created as a Home Assistant device with its own status, diagnostic sensors, and action buttons. Running the add flow again adds another medication to the existing Medication Tracker integration instead of creating a duplicate config entry. The options flow can also add another medication. Service actions are the most flexible way to edit or remove existing medications.
+Medication Tracker keeps one integration entry and creates one Home Assistant device per medication.
 
-### Schedule Types
+To add the first medication:
 
-- `every_day`
-- `multiple_times_per_day`
-- `specific_weekdays`
-- `once_per_week`
-- `cycle`
+1. Go to **Settings > Devices & services**.
+2. Choose **Add integration**.
+3. Search for **Medication Tracker**.
+4. Choose the schedule type.
+5. Fill in the medication details.
 
-Weekdays use Python weekday numbers: Monday is `0`, Sunday is `6`.
+To add more medications, run the same add flow again. If Medication Tracker is already configured, the flow adds the new medication to the existing integration and creates another medication device.
 
-Cycle schedules repeat active and rest blocks. A `cycle_start_date` is the first active day. `cycle_on_days` is the number of days when doses are required. `cycle_off_days` is the number of rest days when the medication is not required. For example, `21` active days and `7` rest days repeats a 28-day pattern.
+You can also add a medication from the integration options or by calling `medication_tracker.add_medication`.
 
-### Examples
+## Schedule Types
 
-Daily at 08:00:
+- `every_day`: Required every calendar day at the due time or times.
+- `multiple_times_per_day`: Required every day, with one dose for each due time.
+- `specific_weekdays`: Required only on selected weekdays.
+- `once_per_week`: Required on one selected weekday each week.
+- `cycle`: Repeats active and rest blocks.
 
-```yaml
-service: medication_tracker.add_medication
-data:
-  name: Vitamin D
-  dose: 1 tablet
-  schedule_type: every_day
-  due_times:
-    - "08:00"
-```
+Weekdays use Python weekday numbers in service calls: Monday is `0`, Sunday is `6`.
 
-Three times per day:
+Cycle schedules use:
 
-```yaml
-service: medication_tracker.add_medication
-data:
-  name: Inhaler
-  dose: 2 puffs
-  schedule_type: multiple_times_per_day
-  due_times:
-    - "08:00"
-    - "13:00"
-    - "20:00"
-```
+- `cycle_start_date`: First active day of the cycle.
+- `cycle_on_days`: Number of active days when doses are required.
+- `cycle_off_days`: Number of rest days when doses are not required.
 
-Weekly on Monday:
+Example: `21` active days and `7` rest days repeats a 28-day pattern.
 
-```yaml
-service: medication_tracker.add_medication
-data:
-  name: Weekly tablet
-  dose: 10mg
-  schedule_type: once_per_week
-  weekdays:
-    - 0
-  due_times:
-    - "09:00"
-```
+## Medication Devices
 
-21 days on, 7 days off:
+Each medication is a Home Assistant device. The device page includes:
 
-```yaml
-service: medication_tracker.add_medication
-data:
-  name: Cycle medication
-  dose: 1 tablet
-  schedule_type: cycle
-  cycle_start_date: "2026-05-11"
-  cycle_on_days: 21
-  cycle_off_days: 7
-  due_times:
-    - "08:00"
-```
+- Main status sensor.
+- **Needs attention** binary sensor.
+- Diagnostic sensors for schedule and dose data.
+- Button entities for quick actions.
 
-## Service Actions
+### Main Status
 
-Mark the earliest unhandled due dose as taken:
-
-```yaml
-service: medication_tracker.mark_taken
-target:
-  entity_id: sensor.vitamin_d
-data:
-  source: Dashboard
-  note: Taken with breakfast
-```
-
-Mark a specific scheduled dose as taken:
-
-```yaml
-service: medication_tracker.mark_taken
-target:
-  entity_id: sensor.inhaler
-data:
-  scheduled_for: "2026-05-11T13:00:00+01:00"
-  taken_at: "2026-05-11T13:05:00+01:00"
-  source: Automation
-```
-
-Undo the latest taken dose:
-
-```yaml
-service: medication_tracker.undo_taken
-target:
-  entity_id: sensor.vitamin_d
-```
-
-Skip a dose:
-
-```yaml
-service: medication_tracker.skip_dose
-target:
-  entity_id: sensor.vitamin_d
-data:
-  reason: Doctor advised skipping today
-  source: Dashboard
-```
-
-Remove a medication:
-
-```yaml
-service: medication_tracker.remove_medication
-target:
-  entity_id: sensor.vitamin_d
-```
-
-Update a medication:
-
-```yaml
-service: medication_tracker.update_medication
-target:
-  entity_id: sensor.vitamin_d
-data:
-  dose: 2 tablets
-  due_times:
-    - "09:00"
-  grace_period_minutes: 90
-```
-
-## Sensor States
-
-- `Not required today`: The schedule does not require a dose today.
-- `Missed`: At least one required dose passed its grace period.
-- `Due now`: At least one unhandled dose is currently due.
-- `Partially taken`: Some doses are handled and more remain today.
-- `Take later today`: A dose is scheduled later today.
-- `Taken today`: All of today's scheduled doses are handled.
-- `Unknown`: The integration cannot determine a better status.
-
-The main status sensor may include timing detail in its state, for example:
+The main sensor is dynamic. Example states:
 
 - `Missed at 08:00`
 - `Due now (13:00)`
 - `Take later today at 20:00`
 - `Taken at 10:05`
 - `Taken at 10:05, next at 20:00`
+- `Not required today`
 
-The stable priority/status value is also exposed as `base_status`, so dashboards and automations can still use the simple status names if needed.
+The stable simple status is exposed as `base_status` for dashboards and automations.
 
-State priority is:
+### Diagnostic Sensors And Attributes
 
-1. `Not required today`
-2. `Missed`
-3. `Due now`
-4. `Partially taken`
-5. `Take later today`
-6. `Taken today`
-7. `Unknown`
-
-Skipped doses count as handled for the daily completion state, but are exposed separately in attributes.
-
-## Attributes
-
-Each medication sensor exposes:
+The main medication data is available both as sensor attributes and as separate diagnostic sensors on the medication device:
 
 - `medication_name`
 - `base_status`
@@ -211,21 +114,155 @@ Each medication sensor exposes:
 - `grace_period_minutes`
 - `notes`
 
-The integration also creates a binary sensor per medication named **Needs attention**, which is on when the medication is due or missed. The main attributes are also exposed as separate diagnostic sensors on the medication device so they are easier to use in dashboards, automations, and the device page.
+### Button Entities
 
-## Button Entities
+Each medication device includes:
 
-Each medication device includes these button entities:
+- **Mark taken**: Marks the next relevant due, missed, or pending dose as taken.
+- **Skip dose**: Marks the next relevant due, missed, or pending dose as intentionally skipped.
+- **Mark not taken**: Undoes the latest taken record for that medication.
 
-- **Mark taken**: marks the next relevant due, missed, or pending dose as taken.
-- **Skip dose**: marks the next relevant due, missed, or pending dose as intentionally skipped.
-- **Mark not taken**: undoes the latest taken record for that medication.
+These buttons use the same local service actions and event flow as automations.
 
-These buttons call the same local service actions as automations and dashboards, so dose history and events stay consistent.
+## Service Actions
+
+Use the medication's main sensor as the target where possible.
+
+Mark the next relevant dose as taken:
+
+```yaml
+action: medication_tracker.mark_taken
+target:
+  entity_id: sensor.vitamin_d
+data:
+  source: Dashboard
+  note: Taken with breakfast
+```
+
+Mark a specific scheduled dose as taken:
+
+```yaml
+action: medication_tracker.mark_taken
+target:
+  entity_id: sensor.inhaler
+data:
+  scheduled_for: "2026-05-13T13:00:00+01:00"
+  taken_at: "2026-05-13T13:05:00+01:00"
+  source: Automation
+```
+
+Undo the latest taken dose:
+
+```yaml
+action: medication_tracker.undo_taken
+target:
+  entity_id: sensor.vitamin_d
+```
+
+Skip a dose:
+
+```yaml
+action: medication_tracker.skip_dose
+target:
+  entity_id: sensor.vitamin_d
+data:
+  reason: Doctor advised skipping today
+  source: Dashboard
+```
+
+Add a medication:
+
+```yaml
+action: medication_tracker.add_medication
+data:
+  name: Vitamin D
+  dose: 1 tablet
+  schedule_type: every_day
+  due_times:
+    - "08:00"
+```
+
+Update a medication:
+
+```yaml
+action: medication_tracker.update_medication
+target:
+  entity_id: sensor.vitamin_d
+data:
+  dose: 2 tablets
+  due_times:
+    - "09:00"
+  grace_period_minutes: 90
+```
+
+Remove a medication:
+
+```yaml
+action: medication_tracker.remove_medication
+target:
+  entity_id: sensor.vitamin_d
+```
+
+## Schedule Examples
+
+Daily at 08:00:
+
+```yaml
+action: medication_tracker.add_medication
+data:
+  name: Vitamin D
+  dose: 1 tablet
+  schedule_type: every_day
+  due_times:
+    - "08:00"
+```
+
+Three times per day:
+
+```yaml
+action: medication_tracker.add_medication
+data:
+  name: Inhaler
+  dose: 2 puffs
+  schedule_type: multiple_times_per_day
+  due_times:
+    - "08:00"
+    - "13:00"
+    - "20:00"
+```
+
+Weekly on Monday:
+
+```yaml
+action: medication_tracker.add_medication
+data:
+  name: Weekly tablet
+  dose: 10mg
+  schedule_type: once_per_week
+  weekdays:
+    - 0
+  due_times:
+    - "09:00"
+```
+
+21 days on, 7 days off:
+
+```yaml
+action: medication_tracker.add_medication
+data:
+  name: Cycle medication
+  dose: 1 tablet
+  schedule_type: cycle
+  cycle_start_date: "2026-05-13"
+  cycle_on_days: 21
+  cycle_off_days: 7
+  due_times:
+    - "08:00"
+```
 
 ## Events
 
-The integration fires these Home Assistant events:
+Medication Tracker fires normal Home Assistant events:
 
 - `medication_tracker_due`
 - `medication_tracker_missed`
@@ -251,37 +288,50 @@ Event data includes:
 
 `due`, `missed`, `required_today`, and `not_required_today` events are de-duplicated so they do not fire repeatedly for the same dose or day.
 
-### Event Automation
+## Automation Examples
+
+Medication due reminder:
 
 ```yaml
 alias: Medication due reminder
-trigger:
-  - platform: event
+triggers:
+  - trigger: event
     event_type: medication_tracker_due
-action:
-  - service: notify.mobile_app_my_phone
+actions:
+  - action: notify.mobile_app_my_phone
     data:
       title: "Medication due"
       message: "{{ trigger.event.data.medication_name }} is due now: {{ trigger.event.data.dose }}"
 ```
 
-Missed dose reminder:
+Medication missed reminder:
 
 ```yaml
 alias: Medication missed reminder
-trigger:
-  - platform: event
+triggers:
+  - trigger: event
     event_type: medication_tracker_missed
-action:
-  - service: notify.mobile_app_my_phone
+actions:
+  - action: notify.mobile_app_my_phone
     data:
       title: "Medication missed"
       message: "{{ trigger.event.data.medication_name }} was due at {{ trigger.event.data.due_time }}"
 ```
 
-## Device Trigger Notes
+Mark a medication as taken from an automation:
 
-Medication devices expose UI-friendly automation triggers:
+```yaml
+actions:
+  - action: medication_tracker.mark_taken
+    target:
+      entity_id: sensor.vitamin_d
+    data:
+      source: Automation
+```
+
+## Device Automations
+
+Medication devices expose UI-friendly triggers:
 
 - Medication becomes due
 - Medication is missed
@@ -290,15 +340,13 @@ Medication devices expose UI-friendly automation triggers:
 - Medication is required today
 - Medication is not required today
 
-These are backed by the normal Home Assistant events above. Event automations are still the most portable option.
-
-Medication devices also expose a UI-friendly action:
+Medication devices also expose UI-friendly actions:
 
 - Mark medication as taken
 - Skip medication dose
 - Mark medication as not taken
 
-These device actions call the matching Medication Tracker services for the selected medication. They are intended for simple automations where you want to choose the medication device in the visual editor.
+These are backed by the normal events and service actions above.
 
 ## Lovelace Markdown Card
 
@@ -307,6 +355,7 @@ type: markdown
 content: |
   {% set meds = states.sensor
     | selectattr('attributes.medication_name', 'defined')
+    | selectattr('attributes.base_status', 'defined')
     | list %}
 
   {% for med in meds %}
@@ -320,7 +369,7 @@ content: |
   {% endfor %}
 ```
 
-## Storage and Retention
+## Storage And Retention
 
 Medication definitions, individual dose events, skipped doses, missed doses, and taken timestamps are stored locally using Home Assistant storage helpers. The default history retention is 90 days. Older dose events and fired-event markers are cleaned up periodically during coordinator refreshes.
 
@@ -332,6 +381,13 @@ Dose events store:
 - Actual action datetime, where relevant
 - Source, where relevant
 - Note or reason, where relevant
+
+## Troubleshooting
+
+- If HACS does not show the latest version, reload HACS or wait for its next refresh, then restart Home Assistant after updating.
+- If Home Assistant still says old wording such as **Add hub**, restart Home Assistant after updating. Manifest metadata is read at startup.
+- If a button action changes history but the UI looks stale, refresh the browser and check the main status sensor plus the `base_status` diagnostic sensor.
+- If you cannot add another medication, update to the latest version and restart. Running the add flow again should add another medication device to the existing integration.
 
 ## Time Handling
 
