@@ -87,7 +87,7 @@ EVENT_TYPES = {
     "not_required_today": EVENT_NOT_REQUIRED_TODAY,
 }
 
-TRIGGER_TYPES = set(EVENT_TYPES)
+TRIGGER_TYPES = tuple(EVENT_TYPES)
 
 ACTION_MARK_TAKEN = "mark_taken"
 ACTION_SKIP_DOSE = "skip_dose"

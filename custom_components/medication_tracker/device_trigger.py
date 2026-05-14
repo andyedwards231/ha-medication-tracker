@@ -44,7 +44,7 @@ async def async_get_triggers(
             CONF_DEVICE_ID: device_id,
             CONF_TYPE: trigger_type,
         }
-        for trigger_type in sorted(TRIGGER_TYPES)
+        for trigger_type in TRIGGER_TYPES
     ]
 
 

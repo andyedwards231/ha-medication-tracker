@@ -253,9 +253,61 @@ actions:
 
 ## Device Automations
 
-Medication devices expose automation triggers for due, missed, taken, skipped, required today, and not required today.
+Medication devices expose automation triggers in the Home Assistant automation
+editor.
+
+To create one:
+
+1. Go to **Settings > Automations & scenes**.
+2. Create or edit an automation.
+3. Add a trigger.
+4. Choose **Device**.
+5. Pick the medication device, for example **Vitamin D**.
+6. Choose one of the Medication Tracker triggers.
+
+Available triggers:
+
+- **Medication becomes due**
+- **Medication is missed**
+- **Medication is marked as taken**
+- **Medication is skipped**
+- **Medication is required today**
+- **Medication is not required today**
+
+Device triggers are filtered to the medication device you choose. Use event
+triggers instead if you want one automation to handle every medication.
 
 They also expose actions for mark taken, skip dose, and mark not taken.
+
+Example device-trigger automation:
+
+```yaml
+alias: Vitamin D due reminder
+triggers:
+  - trigger: device
+    domain: medication_tracker
+    type: due
+    device_id: replace_with_your_medication_device_id
+actions:
+  - action: notify.mobile_app_my_phone
+    data:
+      title: "Medication due"
+      message: "Vitamin D is due"
+```
+
+Example event-trigger automation for all medications:
+
+```yaml
+alias: Any medication skipped
+triggers:
+  - trigger: event
+    event_type: medication_tracker_skipped
+actions:
+  - action: notify.mobile_app_my_phone
+    data:
+      title: "Medication skipped"
+      message: "{{ trigger.event.data.medication_name }} was skipped"
+```
 
 ## Dashboard Example
 
