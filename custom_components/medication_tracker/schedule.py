@@ -22,6 +22,7 @@ from .const import (
     STATUS_MISSED,
     STATUS_NOT_REQUIRED_TODAY,
     STATUS_PARTIALLY_TAKEN,
+    STATUS_SKIPPED_TODAY,
     STATUS_TAKE_LATER_TODAY,
     STATUS_TAKEN_TODAY,
     STATUS_UNKNOWN,
@@ -287,6 +288,10 @@ def compute_medication_status(
         and parse_local_datetime(event.scheduled_for)
         and parse_local_datetime(event.scheduled_for).date() == local_day
     ]
+    last_taken_today = max(
+        (event.acted_at for event in taken_events if event.acted_at),
+        default=None,
+    )
     last_taken = max(
         (
             event.acted_at
@@ -306,6 +311,7 @@ def compute_medication_status(
     first_missed: datetime | None = None
     first_due_now: datetime | None = None
     next_future_today: datetime | None = None
+    last_skipped_today: str | None = None
 
     for scheduled in today_schedules:
         event = event_for_schedule(medication.id, scheduled, events)
@@ -315,6 +321,10 @@ def compute_medication_status(
         if event and event.status == DOSE_STATUS_SKIPPED:
             skipped += 1
             terminal_handled += 1
+            if event.acted_at and (
+                last_skipped_today is None or event.acted_at > last_skipped_today
+            ):
+                last_skipped_today = event.acted_at
             continue
         if event and event.status == DOSE_STATUS_MISSED:
             missed += 1
@@ -350,6 +360,8 @@ def compute_medication_status(
         base_state = STATUS_PARTIALLY_TAKEN
     elif future_unhandled:
         base_state = STATUS_TAKE_LATER_TODAY
+    elif doses_due_today > 0 and skipped > 0 and doses_taken_today == 0:
+        base_state = STATUS_SKIPPED_TODAY
     elif doses_due_today > 0 and terminal_handled == doses_due_today:
         base_state = STATUS_TAKEN_TODAY
     else:
@@ -357,7 +369,8 @@ def compute_medication_status(
 
     state = dynamic_state(
         base_state,
-        last_taken,
+        last_taken_today,
+        last_skipped_today,
         next_due,
         first_missed,
         first_due_now,
@@ -400,6 +413,7 @@ def compute_medication_status(
 def dynamic_state(
     base_state: str,
     last_taken: str | None,
+    last_skipped: str | None,
     next_due: datetime | None,
     first_missed: datetime | None,
     first_due_now: datetime | None,
@@ -417,6 +431,7 @@ def dynamic_state(
         return STATUS_DUE_NOW
     if base_state == STATUS_PARTIALLY_TAKEN:
         taken = _format_local_datetime_string(last_taken)
+        skipped = _format_local_datetime_string(last_skipped)
         due = _format_next_due_for_status(next_due or next_future_today, local_day)
         if taken and due:
             if due == "tomorrow":
@@ -424,6 +439,12 @@ def dynamic_state(
             return f"Taken at {taken}, next at {due}"
         if taken:
             return f"Taken at {taken}"
+        if skipped and due:
+            if due == "tomorrow":
+                return f"Skipped at {skipped}, next dose tomorrow"
+            return f"Skipped at {skipped}, next at {due}"
+        if skipped:
+            return f"Skipped at {skipped}"
         if due:
             return f"Partially taken, next at {due}"
         return STATUS_PARTIALLY_TAKEN
@@ -444,6 +465,15 @@ def dynamic_state(
                 return "Taken today, next dose tomorrow"
             return f"Taken today, next at {due}"
         return STATUS_TAKEN_TODAY
+    if base_state == STATUS_SKIPPED_TODAY:
+        skipped = _format_local_datetime_string(last_skipped)
+        due = _format_next_due_for_status(next_due, local_day)
+        prefix = f"Skipped at {skipped}" if skipped else STATUS_SKIPPED_TODAY
+        if due == "tomorrow":
+            return f"{prefix}, next dose tomorrow"
+        if due:
+            return f"{prefix}, next at {due}"
+        return prefix
     return base_state
 
 

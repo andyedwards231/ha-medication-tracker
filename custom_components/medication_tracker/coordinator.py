@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
-from homeassistant.helpers.event import async_track_point_in_time
+from homeassistant.helpers.event import async_track_point_in_time, async_track_time_change
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
@@ -56,6 +56,7 @@ class MedicationTrackerCoordinator(
         )
         self.store = store
         self._unsub_timer: CALLBACK_TYPE | None = None
+        self._unsub_midnight_timer: CALLBACK_TYPE | None = None
         self._started = False
 
     async def _async_setup(self) -> None:
@@ -78,6 +79,7 @@ class MedicationTrackerCoordinator(
     async def async_start(self) -> None:
         """Start event processing and point-in-time refresh scheduling."""
         self._started = True
+        self._schedule_midnight_refresh()
         await self.async_request_refresh()
         self._schedule_next_refresh()
 
@@ -86,6 +88,21 @@ class MedicationTrackerCoordinator(
         if self._unsub_timer is not None:
             self._unsub_timer()
             self._unsub_timer = None
+        if self._unsub_midnight_timer is not None:
+            self._unsub_midnight_timer()
+            self._unsub_midnight_timer = None
+
+    def _schedule_midnight_refresh(self) -> None:
+        """Schedule a daily refresh shortly after midnight."""
+        if self._unsub_midnight_timer is not None:
+            return
+        self._unsub_midnight_timer = async_track_time_change(
+            self.hass,
+            self._handle_midnight_refresh,
+            hour=0,
+            minute=0,
+            second=5,
+        )
 
     def _schedule_next_refresh(self) -> None:
         """Schedule the next refresh at a meaningful boundary."""
@@ -108,6 +125,11 @@ class MedicationTrackerCoordinator(
     @callback
     def _handle_scheduled_refresh(self, _: datetime) -> None:
         """Handle a scheduled refresh callback."""
+        self.hass.async_create_task(self._async_scheduled_refresh())
+
+    @callback
+    def _handle_midnight_refresh(self, _: datetime) -> None:
+        """Handle the daily midnight refresh callback."""
         self.hass.async_create_task(self._async_scheduled_refresh())
 
     async def _async_scheduled_refresh(self) -> None:

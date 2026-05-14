@@ -89,6 +89,7 @@ The main status sensor can show values such as:
 - `Taken at 10:05`
 - `Taken at 10:05, next at 20:00`
 - `Taken at 10:05, next dose tomorrow`
+- `Skipped at 10:05, next dose tomorrow`
 - `Not required today`
 
 Use the `base_status` diagnostic sensor if you need a stable value for automations.
@@ -282,6 +283,7 @@ cards:
         '⚠️' if status == 'Missed' else
         '💊' if status == 'Due now' else
         '✅' if status == 'Taken today' else
+        '⏭️' if status == 'Skipped today' else
         '◐' if status == 'Partially taken' else
         '🕒' if status == 'Take later today' else
         '−' if status == 'Not required today' else

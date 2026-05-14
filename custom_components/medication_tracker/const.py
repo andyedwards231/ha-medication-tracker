@@ -53,6 +53,7 @@ SCHEDULE_TYPES = {
 STATUS_DUE_NOW = "Due now"
 STATUS_TAKE_LATER_TODAY = "Take later today"
 STATUS_TAKEN_TODAY = "Taken today"
+STATUS_SKIPPED_TODAY = "Skipped today"
 STATUS_PARTIALLY_TAKEN = "Partially taken"
 STATUS_MISSED = "Missed"
 STATUS_NOT_REQUIRED_TODAY = "Not required today"
