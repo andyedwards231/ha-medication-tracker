@@ -84,12 +84,12 @@ The device includes:
 
 The main status sensor can show values such as:
 
-- `Not Required Today`
-- `Next dose due at 08:00`
-- `Required Now`
-- `Taken`
-- `Missed`
-- `Skipped`
+- `Next dose at 08:30`
+- `Due Now`
+- `Taken, next dose at 10:00`
+- `Taken, next dose tomorrow`
+- `Missed, 20 mins late`
+- `Not Required Today, next dose on Monday`
 
 Use the `base_status` diagnostic sensor if you need a stable value for automations.
 
@@ -98,6 +98,7 @@ Daily counters:
 - `doses_required_today`: total scheduled doses for today.
 - `doses_due_today`: unresolved doses still due later or due now today.
 - `doses_taken_today`: doses marked as taken today.
+- `next_dose_in`: minutes until the next dose.
 - `skipped_doses_today`: doses intentionally skipped today.
 - `missed_doses_today`: doses missed today.
 - `remaining_doses_today`: same unresolved count as `doses_due_today`.
@@ -343,10 +344,10 @@ cards:
       {% set status = med.attributes.base_status %}
       {% set icon =
         '⚠️' if status == 'Missed' else
-        '💊' if status == 'Required Now' else
+        '💊' if status == 'Due Now' else
         '✅' if status == 'Taken' else
         '⏭️' if status == 'Skipped' else
-        '🕒' if status == 'Next dose due' else
+        '🕒' if status == 'Next dose' else
         '−' if status == 'Not Required Today' else
         '?' %}
       {% set taken = med.attributes.doses_taken_today | default(0) %}

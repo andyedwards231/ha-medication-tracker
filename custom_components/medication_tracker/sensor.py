@@ -27,6 +27,7 @@ class MedicationSensorDescription:
     name: str
     icon: str
     value_fn: Callable[[dict[str, Any]], Any]
+    unit: str | None = None
 
 
 ATTRIBUTE_SENSORS: tuple[MedicationSensorDescription, ...] = (
@@ -74,6 +75,13 @@ ATTRIBUTE_SENSORS: tuple[MedicationSensorDescription, ...] = (
         "Next due time",
         "mdi:clock-end",
         lambda attrs: attrs.get("next_due_time"),
+    ),
+    MedicationSensorDescription(
+        "next_dose_in",
+        "Next dose in",
+        "mdi:timer-outline",
+        lambda attrs: attrs.get("next_dose_in"),
+        "min",
     ),
     MedicationSensorDescription(
         "last_taken",
@@ -289,6 +297,7 @@ class MedicationAttributeSensor(
         self._attr_unique_id = f"{medication.id}_{description.key}"
         self._attr_name = description.name
         self._attr_icon = description.icon
+        self._attr_native_unit_of_measurement = description.unit
 
     @property
     def medication(self) -> MedicationDefinition | None:

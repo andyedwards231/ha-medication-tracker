@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from math import ceil
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -382,18 +383,19 @@ def compute_medication_status(
         base_state = STATUS_REQUIRED_NOW
     elif missed_doses:
         base_state = STATUS_MISSED
+    elif taken_doses:
+        base_state = STATUS_TAKEN
+    elif skipped_doses:
+        base_state = STATUS_SKIPPED
     elif future_doses:
         base_state = STATUS_NEXT_DOSE_DUE
-    elif doses and skipped == doses_required_today:
-        base_state = STATUS_SKIPPED
-    elif doses and doses_taken_today == doses_required_today:
-        base_state = STATUS_TAKEN
     elif doses and not pending_doses:
         base_state = STATUS_TAKEN
     else:
         base_state = STATUS_UNKNOWN
 
-    state = format_state(base_state, due_now_doses, future_doses, next_due)
+    state = format_state(base_state, missed_doses, future_doses, next_due, now)
+    next_dose_in = minutes_until(next_due, now)
 
     attributes: dict[str, Any] = {
         "medication_name": medication.name,
@@ -404,6 +406,7 @@ def compute_medication_status(
         "due_times": normalize_due_times(medication.due_times),
         "next_due": next_due.isoformat() if next_due else None,
         "next_due_time": _format_local_time(next_due),
+        "next_dose_in": next_dose_in,
         "last_taken": last_taken,
         "last_taken_today": last_taken_today,
         "taken_today": doses_taken_today > 0,
@@ -486,18 +489,64 @@ def current_scheduled_for(
 
 def format_state(
     base_state: str,
-    due_now_doses: list[DoseEvaluation],
+    missed_doses: list[DoseEvaluation],
     future_doses: list[DoseEvaluation],
     next_due: datetime | None,
+    now: datetime,
 ) -> str:
     """Return the user-facing medication state."""
     if base_state == STATUS_REQUIRED_NOW:
         return STATUS_REQUIRED_NOW
     if base_state == STATUS_NEXT_DOSE_DUE:
         next_today = future_doses[0].scheduled if future_doses else next_due
-        due = _format_local_time(next_today)
-        return f"Next dose due at {due}" if due else STATUS_NEXT_DOSE_DUE
+        return format_next_dose_phrase(next_today, now, capitalize=True) or base_state
+    if base_state == STATUS_MISSED:
+        late = missed_late_minutes(missed_doses[0], now) if missed_doses else None
+        state = f"Missed, {late} mins late" if late is not None else STATUS_MISSED
+        phrase = format_next_dose_phrase(next_due, now)
+        return f"{state}, {phrase}" if phrase else state
+    if base_state in {STATUS_TAKEN, STATUS_SKIPPED, STATUS_NOT_REQUIRED_TODAY}:
+        phrase = format_next_dose_phrase(next_due, now)
+        return f"{base_state}, {phrase}" if phrase else base_state
     return base_state
+
+
+def missed_late_minutes(dose: DoseEvaluation, now: datetime) -> int:
+    """Return minutes elapsed since the dose became missed."""
+    seconds = (dt_util.as_local(now) - dt_util.as_local(dose.missed_at)).total_seconds()
+    return max(0, ceil(seconds / 60))
+
+
+def minutes_until(value: datetime | None, now: datetime) -> int | None:
+    """Return whole minutes until a future dose, clamped at zero."""
+    if value is None:
+        return None
+    seconds = (dt_util.as_local(value) - dt_util.as_local(now)).total_seconds()
+    return max(0, ceil(seconds / 60))
+
+
+def format_next_dose_phrase(
+    value: datetime | None, now: datetime, *, capitalize: bool = False
+) -> str | None:
+    """Return compact next-dose text for the main sensor state."""
+    if value is None:
+        return None
+    local_value = dt_util.as_local(value)
+    local_now = dt_util.as_local(now)
+    if local_value <= local_now:
+        return None
+
+    day_delta = (local_value.date() - local_now.date()).days
+    if day_delta == 0:
+        phrase = f"next dose at {local_value.strftime('%H:%M')}"
+    elif day_delta == 1:
+        phrase = "next dose tomorrow"
+    elif 1 < day_delta < 7:
+        phrase = f"next dose on {local_value.strftime('%A')}"
+    else:
+        phrase = f"next dose on {local_value.strftime('%d %b')}"
+
+    return phrase[0].upper() + phrase[1:] if capitalize else phrase
 
 
 def _format_local_time(value: datetime | None) -> str | None:
