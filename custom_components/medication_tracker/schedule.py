@@ -242,11 +242,14 @@ def next_due_datetime(
     local_day = dt_util.as_local(now).date()
     for offset in range(search_days + 1):
         day = local_day + timedelta(days=offset)
-        for dose in dose_evaluations_for_date(hass, medication, events, day, now):
-            if dose.scheduled < now and not dose.is_due_now(now):
+        for scheduled in scheduled_datetimes_for_date(hass, medication, day):
+            if event_is_handled(event_for_schedule(medication.id, scheduled, events)):
                 continue
-            if dose.status == DOSE_STATUS_PENDING:
-                return dose.scheduled
+            if scheduled > now:
+                return scheduled
+            missed_at = scheduled + timedelta(minutes=medication.grace_period_minutes)
+            if scheduled <= now < missed_at:
+                return scheduled
     return None
 
 
