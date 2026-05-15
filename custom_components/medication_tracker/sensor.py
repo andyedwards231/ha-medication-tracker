@@ -70,10 +70,22 @@ ATTRIBUTE_SENSORS: tuple[MedicationSensorDescription, ...] = (
         lambda attrs: attrs.get("next_due"),
     ),
     MedicationSensorDescription(
+        "next_due_time",
+        "Next due time",
+        "mdi:clock-end",
+        lambda attrs: attrs.get("next_due_time"),
+    ),
+    MedicationSensorDescription(
         "last_taken",
         "Last taken",
         "mdi:check-circle-outline",
         lambda attrs: attrs.get("last_taken"),
+    ),
+    MedicationSensorDescription(
+        "last_taken_today",
+        "Last taken today",
+        "mdi:check-circle",
+        lambda attrs: attrs.get("last_taken_today"),
     ),
     MedicationSensorDescription(
         "taken_today",
@@ -92,6 +104,12 @@ ATTRIBUTE_SENSORS: tuple[MedicationSensorDescription, ...] = (
         "Doses due today",
         "mdi:counter",
         lambda attrs: attrs.get("doses_due_today"),
+    ),
+    MedicationSensorDescription(
+        "doses_required_today",
+        "Doses required today",
+        "mdi:counter",
+        lambda attrs: attrs.get("doses_required_today"),
     ),
     MedicationSensorDescription(
         "doses_taken_today",
@@ -116,6 +134,24 @@ ATTRIBUTE_SENSORS: tuple[MedicationSensorDescription, ...] = (
         "Skipped doses today",
         "mdi:skip-next-circle-outline",
         lambda attrs: attrs.get("skipped_doses_today"),
+    ),
+    MedicationSensorDescription(
+        "current_dose_status",
+        "Current dose status",
+        "mdi:list-status",
+        lambda attrs: attrs.get("current_dose_status"),
+    ),
+    MedicationSensorDescription(
+        "current_scheduled_for",
+        "Current scheduled for",
+        "mdi:calendar-clock",
+        lambda attrs: attrs.get("current_scheduled_for"),
+    ),
+    MedicationSensorDescription(
+        "daily_status_date",
+        "Daily status date",
+        "mdi:calendar-today",
+        lambda attrs: attrs.get("daily_status_date"),
     ),
     MedicationSensorDescription(
         "cycle_day",

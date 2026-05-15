@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
@@ -18,13 +19,12 @@ from .const import (
     SCHEDULE_TIMES_PER_DAY,
     SCHEDULE_WEEKDAYS,
     SCHEDULE_WEEKLY,
-    STATUS_DUE_NOW,
+    STATUS_NEXT_DOSE_DUE,
+    STATUS_REQUIRED_NOW,
+    STATUS_SKIPPED,
+    STATUS_TAKEN,
     STATUS_MISSED,
     STATUS_NOT_REQUIRED_TODAY,
-    STATUS_PARTIALLY_TAKEN,
-    STATUS_SKIPPED_TODAY,
-    STATUS_TAKE_LATER_TODAY,
-    STATUS_TAKEN_TODAY,
     STATUS_UNKNOWN,
 )
 from .models import DoseEvent, MedicationDefinition, MedicationStatus
@@ -98,6 +98,37 @@ def normalize_due_times(due_times: list[str] | tuple[str, ...] | None) -> list[s
     return sorted(dict.fromkeys(valid))
 
 
+@dataclass(frozen=True, slots=True)
+class DoseEvaluation:
+    """Source-of-truth view of one scheduled dose occurrence."""
+
+    scheduled: datetime
+    event: DoseEvent | None
+    status: str
+    missed_at: datetime
+    computed_missed: bool
+
+    @property
+    def is_terminal(self) -> bool:
+        """Return whether this dose is no longer pending for today."""
+        return self.status in {
+            DOSE_STATUS_TAKEN,
+            DOSE_STATUS_SKIPPED,
+            DOSE_STATUS_MISSED,
+        }
+
+    def is_due_now(self, now: datetime) -> bool:
+        """Return true when the dose is due and still inside its grace period."""
+        return (
+            self.status == DOSE_STATUS_PENDING
+            and self.scheduled <= now < self.missed_at
+        )
+
+    def is_future(self, now: datetime) -> bool:
+        """Return true when the dose is pending later today."""
+        return self.status == DOSE_STATUS_PENDING and self.scheduled > now
+
+
 def cycle_info(medication: MedicationDefinition, day: date) -> tuple[int | None, str | None]:
     """Return the 1-based cycle day and on/off status for a date."""
     if medication.schedule_type != SCHEDULE_CYCLE:
@@ -160,6 +191,44 @@ def event_is_handled(event: DoseEvent | None) -> bool:
     }
 
 
+def dose_evaluations_for_date(
+    hass: HomeAssistant,
+    medication: MedicationDefinition,
+    events: dict[str, DoseEvent],
+    day: date,
+    now: datetime,
+) -> list[DoseEvaluation]:
+    """Evaluate every scheduled dose for one local date.
+
+    This is the single source of truth for daily counters and status. Stored
+    terminal records win; otherwise the current local time and grace period
+    decide whether a dose is future, due now, or missed.
+    """
+    evaluations: list[DoseEvaluation] = []
+    for scheduled in scheduled_datetimes_for_date(hass, medication, day):
+        event = event_for_schedule(medication.id, scheduled, events)
+        missed_at = scheduled + timedelta(minutes=medication.grace_period_minutes)
+        if event_is_handled(event):
+            status = event.status if event is not None else DOSE_STATUS_PENDING
+            computed_missed = False
+        elif now >= missed_at:
+            status = DOSE_STATUS_MISSED
+            computed_missed = True
+        else:
+            status = DOSE_STATUS_PENDING
+            computed_missed = False
+        evaluations.append(
+            DoseEvaluation(
+                scheduled=scheduled,
+                event=event,
+                status=status,
+                missed_at=missed_at,
+                computed_missed=computed_missed,
+            )
+        )
+    return evaluations
+
+
 def next_due_datetime(
     hass: HomeAssistant,
     medication: MedicationDefinition,
@@ -172,12 +241,11 @@ def next_due_datetime(
     local_day = dt_util.as_local(now).date()
     for offset in range(search_days + 1):
         day = local_day + timedelta(days=offset)
-        for scheduled in scheduled_datetimes_for_date(hass, medication, day):
-            if scheduled < now and offset > 0:
+        for dose in dose_evaluations_for_date(hass, medication, events, day, now):
+            if dose.scheduled < now and not dose.is_due_now(now):
                 continue
-            if not event_is_handled(event_for_schedule(medication.id, scheduled, events)):
-                if scheduled >= now or scheduled.date() == local_day:
-                    return scheduled
+            if dose.status == DOSE_STATUS_PENDING:
+                return dose.scheduled
     return None
 
 
@@ -196,17 +264,15 @@ def next_update_time(
         candidates.append(midnight)
 
     for medication in medications:
-        for scheduled in scheduled_datetimes_for_date(
-            hass, medication, dt_util.as_local(now).date()
+        for dose in dose_evaluations_for_date(
+            hass, medication, events, dt_util.as_local(now).date(), now
         ):
-            event = event_for_schedule(medication.id, scheduled, events)
-            if event_is_handled(event):
+            if dose.is_terminal:
                 continue
-            missed_at = scheduled + timedelta(minutes=medication.grace_period_minutes)
-            if scheduled > now:
-                candidates.append(scheduled)
-            if missed_at > now:
-                candidates.append(missed_at)
+            if dose.scheduled > now:
+                candidates.append(dose.scheduled)
+            if dose.missed_at > now:
+                candidates.append(dose.missed_at)
         next_due = next_due_datetime(hass, medication, events, now)
         if next_due is not None and next_due > now:
             candidates.append(next_due)
@@ -273,25 +339,22 @@ def compute_medication_status(
     events: dict[str, DoseEvent],
     now: datetime | None = None,
 ) -> MedicationStatus:
-    """Compute the display state and attributes for a medication."""
+    """Compute today's status from schedule, records, local time, and grace."""
     now = now or local_now()
     local_day = dt_util.as_local(now).date()
     required_today = is_required_on_date(medication, local_day)
-    today_schedules = scheduled_datetimes_for_date(hass, medication, local_day)
+    doses = dose_evaluations_for_date(hass, medication, events, local_day, now)
     cycle_day, cycle_status = cycle_info(medication, local_day)
 
-    taken_events = [
-        event
-        for event in events.values()
-        if event.medication_id == medication.id
-        and event.status == DOSE_STATUS_TAKEN
-        and parse_local_datetime(event.scheduled_for)
-        and parse_local_datetime(event.scheduled_for).date() == local_day
-    ]
-    last_taken_today = max(
-        (event.acted_at for event in taken_events if event.acted_at),
-        default=None,
-    )
+    taken_doses = [dose for dose in doses if dose.status == DOSE_STATUS_TAKEN]
+    skipped_doses = [dose for dose in doses if dose.status == DOSE_STATUS_SKIPPED]
+    missed_doses = [dose for dose in doses if dose.status == DOSE_STATUS_MISSED]
+    due_now_doses = [dose for dose in doses if dose.is_due_now(now)]
+    future_doses = [dose for dose in doses if dose.is_future(now)]
+    pending_doses = [dose for dose in doses if dose.status == DOSE_STATUS_PENDING]
+
+    last_taken_today = latest_acted_at(taken_doses)
+    last_skipped_today = latest_acted_at(skipped_doses)
     last_taken = max(
         (
             event.acted_at
@@ -303,80 +366,34 @@ def compute_medication_status(
         default=None,
     )
 
-    missed = 0
-    skipped = 0
-    terminal_handled = 0
-    due_now = False
-    future_unhandled = False
-    first_missed: datetime | None = None
-    first_due_now: datetime | None = None
-    next_future_today: datetime | None = None
-    last_skipped_today: str | None = None
-
-    for scheduled in today_schedules:
-        event = event_for_schedule(medication.id, scheduled, events)
-        if event and event.status == DOSE_STATUS_TAKEN:
-            terminal_handled += 1
-            continue
-        if event and event.status == DOSE_STATUS_SKIPPED:
-            skipped += 1
-            terminal_handled += 1
-            if event.acted_at and (
-                last_skipped_today is None or event.acted_at > last_skipped_today
-            ):
-                last_skipped_today = event.acted_at
-            continue
-        if event and event.status == DOSE_STATUS_MISSED:
-            missed += 1
-            terminal_handled += 1
-            first_missed = first_missed or scheduled
-            continue
-
-        missed_at = scheduled + timedelta(minutes=medication.grace_period_minutes)
-        if now > missed_at:
-            missed += 1
-            terminal_handled += 1
-            first_missed = first_missed or scheduled
-        elif scheduled <= now:
-            due_now = True
-            first_due_now = first_due_now or scheduled
-        else:
-            future_unhandled = True
-            next_future_today = next_future_today or scheduled
-
-    doses_due_today = len(today_schedules)
-    doses_taken_today = len(taken_events)
-    remaining = max(doses_due_today - terminal_handled, 0)
-
+    doses_required_today = len(doses)
+    doses_taken_today = len(taken_doses)
+    skipped = len(skipped_doses)
+    missed = len(missed_doses)
+    remaining = len(pending_doses)
     next_due = next_due_datetime(hass, medication, events, now)
+    current_dose_status = current_status_key(
+        required_today, doses, due_now_doses, missed_doses, future_doses
+    )
 
     if not required_today:
         base_state = STATUS_NOT_REQUIRED_TODAY
-    elif missed > 0:
+    elif due_now_doses:
+        base_state = STATUS_REQUIRED_NOW
+    elif missed_doses:
         base_state = STATUS_MISSED
-    elif due_now:
-        base_state = STATUS_DUE_NOW
-    elif terminal_handled > 0 and (future_unhandled or remaining > 0):
-        base_state = STATUS_PARTIALLY_TAKEN
-    elif future_unhandled:
-        base_state = STATUS_TAKE_LATER_TODAY
-    elif doses_due_today > 0 and skipped > 0 and doses_taken_today == 0:
-        base_state = STATUS_SKIPPED_TODAY
-    elif doses_due_today > 0 and terminal_handled == doses_due_today:
-        base_state = STATUS_TAKEN_TODAY
+    elif future_doses:
+        base_state = STATUS_NEXT_DOSE_DUE
+    elif doses and skipped == doses_required_today:
+        base_state = STATUS_SKIPPED
+    elif doses and doses_taken_today == doses_required_today:
+        base_state = STATUS_TAKEN
+    elif doses and not pending_doses:
+        base_state = STATUS_TAKEN
     else:
         base_state = STATUS_UNKNOWN
 
-    state = dynamic_state(
-        base_state,
-        last_taken_today,
-        last_skipped_today,
-        next_due,
-        first_missed,
-        first_due_now,
-        next_future_today,
-        local_day,
-    )
+    state = format_state(base_state, due_now_doses, future_doses, next_due)
 
     attributes: dict[str, Any] = {
         "medication_name": medication.name,
@@ -386,14 +403,22 @@ def compute_medication_status(
         "schedule_type": medication.schedule_type,
         "due_times": normalize_due_times(medication.due_times),
         "next_due": next_due.isoformat() if next_due else None,
+        "next_due_time": _format_local_time(next_due),
         "last_taken": last_taken,
+        "last_taken_today": last_taken_today,
         "taken_today": doses_taken_today > 0,
         "required_today": required_today,
-        "doses_due_today": doses_due_today,
+        "doses_required_today": doses_required_today,
+        "doses_due_today": doses_required_today,
         "doses_taken_today": doses_taken_today,
         "remaining_doses_today": remaining,
         "missed_doses_today": missed,
         "skipped_doses_today": skipped,
+        "current_dose_status": current_dose_status,
+        "current_scheduled_for": current_scheduled_for(
+            due_now_doses, missed_doses, future_doses
+        ),
+        "daily_status_date": local_day.isoformat(),
         "grace_period_minutes": medication.grace_period_minutes,
         "notes": medication.notes,
     }
@@ -406,83 +431,73 @@ def compute_medication_status(
         medication_id=medication.id,
         state=state,
         attributes=attributes,
-        is_due_or_missed=base_state in {STATUS_DUE_NOW, STATUS_MISSED},
+        is_due_or_missed=base_state in {STATUS_REQUIRED_NOW, STATUS_MISSED},
     )
 
 
-def dynamic_state(
-    base_state: str,
-    last_taken: str | None,
-    last_skipped: str | None,
-    next_due: datetime | None,
-    first_missed: datetime | None,
-    first_due_now: datetime | None,
-    next_future_today: datetime | None,
-    local_day: date,
+def latest_acted_at(doses: list[DoseEvaluation]) -> str | None:
+    """Return the latest action timestamp from evaluated doses."""
+    return max(
+        (
+            dose.event.acted_at
+            for dose in doses
+            if dose.event is not None and dose.event.acted_at
+        ),
+        default=None,
+    )
+
+
+def current_status_key(
+    required_today: bool,
+    doses: list[DoseEvaluation],
+    due_now_doses: list[DoseEvaluation],
+    missed_doses: list[DoseEvaluation],
+    future_doses: list[DoseEvaluation],
 ) -> str:
-    """Return a friendly, dynamic state string."""
-    if base_state == STATUS_MISSED:
-        if first_missed is not None:
-            return f"Missed at {_format_local_time(first_missed)}"
-        return STATUS_MISSED
-    if base_state == STATUS_DUE_NOW:
-        if first_due_now is not None:
-            return f"Due now ({_format_local_time(first_due_now)})"
-        return STATUS_DUE_NOW
-    if base_state == STATUS_PARTIALLY_TAKEN:
-        taken = _format_local_datetime_string(last_taken)
-        skipped = _format_local_datetime_string(last_skipped)
-        due = _format_next_due_for_status(next_due or next_future_today, local_day)
-        if taken and due:
-            if due == "tomorrow":
-                return f"Taken at {taken}, next dose tomorrow"
-            return f"Taken at {taken}, next at {due}"
-        if taken:
-            return f"Taken at {taken}"
-        if skipped and due:
-            if due == "tomorrow":
-                return f"Skipped at {skipped}, next dose tomorrow"
-            return f"Skipped at {skipped}, next at {due}"
-        if skipped:
-            return f"Skipped at {skipped}"
-        if due:
-            return f"Partially taken, next at {due}"
-        return STATUS_PARTIALLY_TAKEN
-    if base_state == STATUS_TAKE_LATER_TODAY:
-        due = _format_local_time(next_due or next_future_today)
-        return f"Take later today at {due}" if due else STATUS_TAKE_LATER_TODAY
-    if base_state == STATUS_TAKEN_TODAY:
-        taken = _format_local_datetime_string(last_taken)
-        due = _format_next_due_for_status(next_due, local_day)
-        if taken and due:
-            if due == "tomorrow":
-                return f"Taken at {taken}, next dose tomorrow"
-            return f"Taken at {taken}, next at {due}"
-        if taken:
-            return f"Taken at {taken}"
-        if due:
-            if due == "tomorrow":
-                return "Taken today, next dose tomorrow"
-            return f"Taken today, next at {due}"
-        return STATUS_TAKEN_TODAY
-    if base_state == STATUS_SKIPPED_TODAY:
-        skipped = _format_local_datetime_string(last_skipped)
-        due = _format_next_due_for_status(next_due, local_day)
-        prefix = f"Skipped at {skipped}" if skipped else STATUS_SKIPPED_TODAY
-        if due == "tomorrow":
-            return f"{prefix}, next dose tomorrow"
-        if due:
-            return f"{prefix}, next at {due}"
-        return prefix
+    """Return a machine-friendly current daily dose status."""
+    if not required_today:
+        return "not_required"
+    if due_now_doses:
+        return "required_now"
+    if missed_doses:
+        return "missed"
+    if future_doses:
+        return "pending"
+    if doses and all(dose.status == DOSE_STATUS_SKIPPED for dose in doses):
+        return "skipped"
+    if doses and all(dose.status == DOSE_STATUS_TAKEN for dose in doses):
+        return "taken"
+    if doses:
+        return "completed"
+    return "unknown"
+
+
+def current_scheduled_for(
+    due_now_doses: list[DoseEvaluation],
+    missed_doses: list[DoseEvaluation],
+    future_doses: list[DoseEvaluation],
+) -> str | None:
+    """Return the most relevant scheduled dose datetime for attributes."""
+    for dose_list in (due_now_doses, missed_doses, future_doses):
+        if dose_list:
+            return dose_list[0].scheduled.isoformat()
+    return None
+
+
+def format_state(
+    base_state: str,
+    due_now_doses: list[DoseEvaluation],
+    future_doses: list[DoseEvaluation],
+    next_due: datetime | None,
+) -> str:
+    """Return the user-facing medication state."""
+    if base_state == STATUS_REQUIRED_NOW:
+        return STATUS_REQUIRED_NOW
+    if base_state == STATUS_NEXT_DOSE_DUE:
+        next_today = future_doses[0].scheduled if future_doses else next_due
+        due = _format_local_time(next_today)
+        return f"Next dose due at {due}" if due else STATUS_NEXT_DOSE_DUE
     return base_state
-
-
-def _format_local_datetime_string(value: str | None) -> str | None:
-    """Format an ISO datetime as local HH:MM."""
-    parsed = parse_local_datetime(value)
-    if parsed is None:
-        return None
-    return parsed.strftime("%H:%M")
 
 
 def _format_local_time(value: datetime | None) -> str | None:
@@ -490,13 +505,3 @@ def _format_local_time(value: datetime | None) -> str | None:
     if value is None:
         return None
     return dt_util.as_local(value).strftime("%H:%M")
-
-
-def _format_next_due_for_status(value: datetime | None, local_day: date) -> str | None:
-    """Format the next dose for compact status text."""
-    if value is None:
-        return None
-    local_value = dt_util.as_local(value)
-    if local_value.date() == local_day + timedelta(days=1):
-        return "tomorrow"
-    return local_value.strftime("%H:%M")

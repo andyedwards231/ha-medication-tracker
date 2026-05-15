@@ -83,14 +83,12 @@ The device includes:
 
 The main status sensor can show values such as:
 
-- `Missed at 08:00`
-- `Due now (13:00)`
-- `Take later today at 20:00`
-- `Taken at 10:05`
-- `Taken at 10:05, next at 20:00`
-- `Taken at 10:05, next dose tomorrow`
-- `Skipped at 10:05, next dose tomorrow`
-- `Not required today`
+- `Not Required Today`
+- `Next dose due at 08:00`
+- `Required Now`
+- `Taken`
+- `Missed`
+- `Skipped`
 
 Use the `base_status` diagnostic sensor if you need a stable value for automations.
 
@@ -333,12 +331,11 @@ cards:
       {% set status = med.attributes.base_status %}
       {% set icon =
         '⚠️' if status == 'Missed' else
-        '💊' if status == 'Due now' else
-        '✅' if status == 'Taken today' else
-        '⏭️' if status == 'Skipped today' else
-        '◐' if status == 'Partially taken' else
-        '🕒' if status == 'Take later today' else
-        '−' if status == 'Not required today' else
+        '💊' if status == 'Required Now' else
+        '✅' if status == 'Taken' else
+        '⏭️' if status == 'Skipped' else
+        '🕒' if status == 'Next dose due' else
+        '−' if status == 'Not Required Today' else
         '?' %}
       {% set taken = med.attributes.doses_taken_today | default(0) %}
       {% set due = med.attributes.doses_due_today | default(0) %}

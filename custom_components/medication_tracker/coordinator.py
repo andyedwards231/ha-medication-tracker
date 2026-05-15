@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
 from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
-from homeassistant.helpers.event import async_track_point_in_time, async_track_time_change
+from homeassistant.helpers.event import async_track_point_in_time
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .const import (
     DOSE_STATUS_MISSED,
-    DOSE_STATUS_PENDING,
     DOSE_STATUS_SKIPPED,
     DOSE_STATUS_TAKEN,
     EVENT_DUE,
@@ -27,14 +26,13 @@ from .models import DoseEvent, MedicationDefinition, MedicationStatus
 from .schedule import (
     compute_medication_status,
     cycle_info,
-    event_for_schedule,
+    dose_evaluations_for_date,
     event_is_handled,
     find_target_schedule,
     is_required_on_date,
     latest_taken_event,
     local_now,
     next_update_time,
-    scheduled_datetimes_for_date,
 )
 from .storage import MedicationTrackerStore
 
@@ -56,7 +54,6 @@ class MedicationTrackerCoordinator(
         )
         self.store = store
         self._unsub_timer: CALLBACK_TYPE | None = None
-        self._unsub_midnight_timer: CALLBACK_TYPE | None = None
         self._started = False
 
     async def _async_setup(self) -> None:
@@ -79,7 +76,6 @@ class MedicationTrackerCoordinator(
     async def async_start(self) -> None:
         """Start event processing and point-in-time refresh scheduling."""
         self._started = True
-        self._schedule_midnight_refresh()
         await self.async_request_refresh()
         self._schedule_next_refresh()
 
@@ -88,21 +84,6 @@ class MedicationTrackerCoordinator(
         if self._unsub_timer is not None:
             self._unsub_timer()
             self._unsub_timer = None
-        if self._unsub_midnight_timer is not None:
-            self._unsub_midnight_timer()
-            self._unsub_midnight_timer = None
-
-    def _schedule_midnight_refresh(self) -> None:
-        """Schedule a daily refresh shortly after midnight."""
-        if self._unsub_midnight_timer is not None:
-            return
-        self._unsub_midnight_timer = async_track_time_change(
-            self.hass,
-            self._handle_midnight_refresh,
-            hour=0,
-            minute=0,
-            second=5,
-        )
 
     def _schedule_next_refresh(self) -> None:
         """Schedule the next refresh at a meaningful boundary."""
@@ -125,11 +106,6 @@ class MedicationTrackerCoordinator(
     @callback
     def _handle_scheduled_refresh(self, _: datetime) -> None:
         """Handle a scheduled refresh callback."""
-        self.hass.async_create_task(self._async_scheduled_refresh())
-
-    @callback
-    def _handle_midnight_refresh(self, _: datetime) -> None:
-        """Handle the daily midnight refresh callback."""
         self.hass.async_create_task(self._async_scheduled_refresh())
 
     async def _async_scheduled_refresh(self) -> None:
@@ -162,42 +138,35 @@ class MedicationTrackerCoordinator(
                 )
                 await self.store.async_mark_fired(daily_key)
 
-            for scheduled in scheduled_datetimes_for_date(self.hass, medication, today):
-                event = event_for_schedule(
-                    medication.id, scheduled, self.store.dose_events
-                )
-                missed_at = scheduled + timedelta(
-                    minutes=medication.grace_period_minutes
-                )
-
-                if event and event.status in {
+            for dose in dose_evaluations_for_date(
+                self.hass, medication, self.store.dose_events, today, now
+            ):
+                if dose.event and dose.event.status in {
                     DOSE_STATUS_TAKEN,
                     DOSE_STATUS_SKIPPED,
                 }:
                     continue
 
-                if now > missed_at and not (
-                    event and event.status == DOSE_STATUS_MISSED
-                ):
+                if dose.computed_missed:
                     event = await self.store.async_set_dose_event(
-                        medication.id, scheduled, DOSE_STATUS_MISSED
+                        medication.id, dose.scheduled, DOSE_STATUS_MISSED
                     )
-                    missed_key = f"missed:{medication.id}:{scheduled.isoformat()}"
+                    missed_key = f"missed:{medication.id}:{dose.scheduled.isoformat()}"
                     if not self.store.has_fired(missed_key):
                         await self._async_fire_event(
-                            EVENT_MISSED, medication, scheduled, event
+                            EVENT_MISSED, medication, dose.scheduled, event
                         )
                         await self.store.async_mark_fired(missed_key)
                     continue
 
-                if scheduled <= now and not event_is_handled(event):
+                if dose.is_due_now(now) and not event_is_handled(dose.event):
                     event = await self.store.async_ensure_pending_event(
-                        medication.id, scheduled
+                        medication.id, dose.scheduled
                     )
-                    due_key = f"due:{medication.id}:{scheduled.isoformat()}"
+                    due_key = f"due:{medication.id}:{dose.scheduled.isoformat()}"
                     if not self.store.has_fired(due_key):
                         await self._async_fire_event(
-                            EVENT_DUE, medication, scheduled, event
+                            EVENT_DUE, medication, dose.scheduled, event
                         )
                         await self.store.async_mark_fired(due_key)
 
