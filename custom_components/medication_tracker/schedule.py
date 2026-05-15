@@ -409,7 +409,7 @@ def compute_medication_status(
         "taken_today": doses_taken_today > 0,
         "required_today": required_today,
         "doses_required_today": doses_required_today,
-        "doses_due_today": doses_required_today,
+        "doses_due_today": remaining,
         "doses_taken_today": doses_taken_today,
         "remaining_doses_today": remaining,
         "missed_doses_today": missed,

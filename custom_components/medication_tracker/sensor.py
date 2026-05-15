@@ -101,7 +101,7 @@ ATTRIBUTE_SENSORS: tuple[MedicationSensorDescription, ...] = (
     ),
     MedicationSensorDescription(
         "doses_due_today",
-        "Doses due today",
+        "Doses due remaining today",
         "mdi:counter",
         lambda attrs: attrs.get("doses_due_today"),
     ),

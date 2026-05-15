@@ -92,6 +92,15 @@ The main status sensor can show values such as:
 
 Use the `base_status` diagnostic sensor if you need a stable value for automations.
 
+Daily counters:
+
+- `doses_required_today`: total scheduled doses for today.
+- `doses_due_today`: unresolved doses still due later or due now today.
+- `doses_taken_today`: doses marked as taken today.
+- `skipped_doses_today`: doses intentionally skipped today.
+- `missed_doses_today`: doses missed today.
+- `remaining_doses_today`: same unresolved count as `doses_due_today`.
+
 ## Buttons
 
 - **Mark taken** marks the next due, missed, or pending dose as taken.
@@ -338,11 +347,12 @@ cards:
         '−' if status == 'Not Required Today' else
         '?' %}
       {% set taken = med.attributes.doses_taken_today | default(0) %}
+      {% set required = med.attributes.doses_required_today | default(0) %}
       {% set due = med.attributes.doses_due_today | default(0) %}
       {% set missed = med.attributes.missed_doses_today | default(0) %}
       {% set skipped = med.attributes.skipped_doses_today | default(0) %}
       {% set next_due = med.attributes.next_due %}
-      | {{ icon }} | **{{ med.attributes.medication_name or med.name }}**<br>{{ med.attributes.dose or '' }} | {{ med.state }}{% if next_due %}<br>Next: {{ as_timestamp(next_due) | timestamp_custom('%H:%M', true) }}{% endif %} | {{ taken }}/{{ due }}{% if missed | int > 0 %}<br>Missed: {{ missed }}{% endif %}{% if skipped | int > 0 %}<br>Skipped: {{ skipped }}{% endif %} |
+      | {{ icon }} | **{{ med.attributes.medication_name or med.name }}**<br>{{ med.attributes.dose or '' }} | {{ med.state }}{% if next_due %}<br>Next: {{ as_timestamp(next_due) | timestamp_custom('%H:%M', true) }}{% endif %} | {{ taken }}/{{ required }}{% if due | int > 0 %}<br>Due: {{ due }}{% endif %}{% if missed | int > 0 %}<br>Missed: {{ missed }}{% endif %}{% if skipped | int > 0 %}<br>Skipped: {{ skipped }}{% endif %} |
       {% endfor %}
 
   - type: grid
