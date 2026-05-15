@@ -277,6 +277,13 @@ class MedicationTrackerCoordinator(
         await self.async_refresh_and_reschedule()
         return event
 
+    async def async_reset_today(self, medication: MedicationDefinition) -> int:
+        """Clear today's dose records for a medication and recalculate state."""
+        local_day = dt_util.as_local(local_now()).date()
+        removed = await self.store.async_clear_medication_day(medication.id, local_day)
+        await self.async_refresh_and_reschedule()
+        return removed
+
     async def async_add_or_update_medication(
         self, medication: MedicationDefinition
     ) -> MedicationDefinition:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import re
 from typing import Any
 
@@ -120,6 +120,35 @@ class MedicationTrackerStore:
             key for key in self.fired_event_keys if f":{medication_id}:" not in key
         }
         await self.async_save()
+        return removed
+
+    async def async_clear_medication_day(self, medication_id: str, day: date) -> int:
+        """Remove dose records and event markers for one medication local day."""
+        removed = 0
+        for event_id, event in list(self.dose_events.items()):
+            if event.medication_id != medication_id:
+                continue
+            scheduled = dt_util.parse_datetime(event.scheduled_for)
+            if scheduled is None:
+                continue
+            if scheduled.tzinfo is None:
+                scheduled = dt_util.as_local(dt_util.as_utc(scheduled))
+            else:
+                scheduled = dt_util.as_local(scheduled)
+            if scheduled.date() == day:
+                del self.dose_events[event_id]
+                removed += 1
+
+        day_text = day.isoformat()
+        fired_event_keys = {
+            key
+            for key in self.fired_event_keys
+            if not (f":{medication_id}:" in key and day_text in key)
+        }
+        changed = removed > 0 or fired_event_keys != self.fired_event_keys
+        self.fired_event_keys = fired_event_keys
+        if changed:
+            await self.async_save()
         return removed
 
     async def async_set_entity_id(self, medication_id: str, entity_id: str) -> None:

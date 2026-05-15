@@ -80,6 +80,7 @@ The device includes:
 - **Mark taken** button
 - **Skip dose** button
 - **Mark not taken** button
+- **Reset today** button
 
 The main status sensor can show values such as:
 
@@ -106,6 +107,8 @@ Daily counters:
 - **Mark taken** marks the next due, missed, or pending dose as taken.
 - **Skip dose** marks the next due, missed, or pending dose as skipped.
 - **Mark not taken** removes the latest taken record.
+- **Reset today** clears today's taken, skipped, pending, and missed records for
+  that medication, then recalculates the state from the current time.
 
 ## Service Actions
 

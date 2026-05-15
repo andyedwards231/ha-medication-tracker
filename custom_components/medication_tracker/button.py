@@ -52,6 +52,13 @@ async def _mark_not_taken(
     await coordinator.async_undo_taken(medication)
 
 
+async def _reset_today(
+    coordinator: MedicationTrackerCoordinator, medication: MedicationDefinition
+) -> None:
+    """Reset today's dose history for this medication."""
+    await coordinator.async_reset_today(medication)
+
+
 BUTTONS: tuple[MedicationButtonDescription, ...] = (
     MedicationButtonDescription(
         "mark_taken", "Mark taken", "mdi:pill", _mark_taken
@@ -61,6 +68,9 @@ BUTTONS: tuple[MedicationButtonDescription, ...] = (
     ),
     MedicationButtonDescription(
         "mark_not_taken", "Mark not taken", "mdi:undo", _mark_not_taken
+    ),
+    MedicationButtonDescription(
+        "reset_today", "Reset today", "mdi:restore", _reset_today
     ),
 )
 
